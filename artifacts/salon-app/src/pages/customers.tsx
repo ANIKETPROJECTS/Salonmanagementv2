@@ -62,6 +62,7 @@ export default function Customers() {
 
   const [showAdd, setShowAdd] = useState(false);
   const [createLoading, setCreateLoading] = useState(false);
+  const [createError, setCreateError] = useState("");
   const [phoneError, setPhoneError] = useState("");
   const [formData, setFormData] = useState({ name: "", phone: "", dob: "", anniversary: "", gender: "", familyMembers: [] as FamilyMember[], membershipId: "", membershipStartDate: format(new Date(), "yyyy-MM-dd") });
   const [showFamilySection, setShowFamilySection] = useState(false);
@@ -73,6 +74,7 @@ export default function Customers() {
   const [editCustomer, setEditCustomer] = useState<any>(null);
   const [editForm, setEditForm] = useState({ name: "", phone: "", dob: "", anniversary: "", gender: "", familyMembers: [] as FamilyMember[] });
   const [editPhoneError, setEditPhoneError] = useState("");
+  const [editError, setEditError] = useState("");
   const [editSaving, setEditSaving] = useState(false);
   const [showEditFamilySection, setShowEditFamilySection] = useState(false);
   const [editMembershipId, setEditMembershipId] = useState("");
@@ -110,6 +112,7 @@ export default function Customers() {
   const resetAddForm = () => {
     setFormData({ name: "", phone: "", dob: "", anniversary: "", gender: "", familyMembers: [], membershipId: "", membershipStartDate: format(new Date(), "yyyy-MM-dd") });
     setPhoneError("");
+    setCreateError("");
     setShowFamilySection(false);
   };
 
@@ -125,9 +128,10 @@ export default function Customers() {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        toast({ title: "Already Exists", description: err.error || "Failed to add customer.", variant: "destructive" });
+        setCreateError(err.error || "Failed to add customer.");
         return;
       }
+      setCreateError("");
       const created = await res.json();
       const customerId = created?.id || created?._id;
       if (formData.membershipId && customerId) {
@@ -144,7 +148,7 @@ export default function Customers() {
       resetAddForm();
       refetch();
     } catch {
-      toast({ title: "Error", description: "Failed to add customer.", variant: "destructive" });
+      setCreateError("Something went wrong. Please try again.");
     } finally {
       setCreateLoading(false);
     }
@@ -177,6 +181,7 @@ export default function Customers() {
       })) : [],
     });
     setEditPhoneError("");
+    setEditError("");
     setEditMembershipId("");
     setEditMembershipStartDate(format(new Date(), "yyyy-MM-dd"));
     setShowEditFamilySection(Array.isArray(c.familyMembers) && c.familyMembers.length > 0);
@@ -195,9 +200,10 @@ export default function Customers() {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        toast({ title: "Already Exists", description: err.error || "Failed to update customer.", variant: "destructive" });
+        setEditError(err.error || "Failed to update customer.");
         return;
       }
+      setEditError("");
       if (editMembershipId) {
         try {
           await fetch(`${API_BASE}/customer-memberships`, {
@@ -416,6 +422,12 @@ export default function Customers() {
               </button>
             </div>
             <form onSubmit={handleCreate} className="overflow-y-auto flex-1 px-8 pb-8 space-y-4">
+              {createError && (
+                <div className="flex items-start gap-2.5 px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm animate-in fade-in">
+                  <span className="mt-0.5 shrink-0 text-red-500">⚠</span>
+                  <span>{createError}</span>
+                </div>
+              )}
               {/* Name */}
               <div>
                 <label className="block text-sm font-medium mb-1 text-muted-foreground">Customer Name *</label>
@@ -600,6 +612,12 @@ export default function Customers() {
               </button>
             </div>
             <form onSubmit={handleEdit} className="overflow-y-auto flex-1 px-8 pb-8 space-y-4">
+              {editError && (
+                <div className="flex items-start gap-2.5 px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm animate-in fade-in">
+                  <span className="mt-0.5 shrink-0 text-red-500">⚠</span>
+                  <span>{editError}</span>
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium mb-1 text-muted-foreground">Customer Name *</label>
                 <input required autoFocus placeholder="Enter full name"
