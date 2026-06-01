@@ -55,15 +55,21 @@ export const Staff =
 export interface IService extends Document {
   name: string;
   category: string;
+  type?: string;
   price: number;
   duration: number;
+  memberDiscount: number;
+  memberPrice: number;
 }
 
 const ServiceSchema = new Schema<IService>({
   name: { type: String, required: true },
   category: { type: String, required: true },
+  type: { type: String, default: "" },
   price: { type: Number, required: true },
   duration: { type: Number, required: true },
+  memberDiscount: { type: Number, default: 20 },
+  memberPrice: { type: Number, default: 0 },
 });
 
 export const Service =

@@ -501,9 +501,15 @@ components:
           type: string
         category:
           type: string
+        type:
+          type: string
         price:
           type: number
         duration:
+          type: number
+        memberDiscount:
+          type: number
+        memberPrice:
           type: number
       required: [id, name, category, price, duration]
 
@@ -518,6 +524,10 @@ components:
           type: array
           items:
             type: string
+        types:
+          type: array
+          items:
+            type: string
       required: [services, categories]
 
     CreateServiceBody:
@@ -527,9 +537,15 @@ components:
           type: string
         category:
           type: string
+        type:
+          type: string
         price:
           type: number
         duration:
+          type: number
+        memberDiscount:
+          type: number
+        memberPrice:
           type: number
       required: [name, category, price, duration]
 

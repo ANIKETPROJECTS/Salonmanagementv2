@@ -87,20 +87,27 @@ export interface Service {
   id: string;
   name: string;
   category: string;
+  type?: string;
   price: number;
   duration: number;
+  memberDiscount?: number;
+  memberPrice?: number;
 }
 
 export interface ServiceListResponse {
   services: Service[];
   categories: string[];
+  types?: string[];
 }
 
 export interface CreateServiceBody {
   name: string;
   category: string;
+  type?: string;
   price: number;
   duration: number;
+  memberDiscount?: number;
+  memberPrice?: number;
 }
 
 export interface Product {
