@@ -15,7 +15,7 @@ router.get("/services", async (_req, res) => {
 });
 
 router.post("/services", async (req, res) => {
-  const { name, category, type, price, duration, memberDiscount, memberPrice } = req.body;
+  const { name, category, type, price, memberDiscount, memberPrice } = req.body;
   const computedMemberDiscount = memberDiscount ?? 20;
   const computedMemberPrice = memberPrice ?? Math.round(price * (1 - computedMemberDiscount / 100));
   const service = await Service.create({
@@ -23,7 +23,6 @@ router.post("/services", async (req, res) => {
     category,
     type: type || "",
     price,
-    duration,
     memberDiscount: computedMemberDiscount,
     memberPrice: computedMemberPrice,
   });
@@ -31,10 +30,10 @@ router.post("/services", async (req, res) => {
 });
 
 router.put("/services/:id", async (req, res) => {
-  const { name, category, type, price, duration, memberDiscount, memberPrice } = req.body;
+  const { name, category, type, price, memberDiscount, memberPrice } = req.body;
   const service = await Service.findByIdAndUpdate(
     req.params.id,
-    { name, category, type: type || "", price, duration, memberDiscount, memberPrice },
+    { name, category, type: type || "", price, memberDiscount, memberPrice },
     { new: true }
   );
   if (!service) return res.status(404).json({ error: "Service not found" });

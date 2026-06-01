@@ -57,7 +57,6 @@ export interface IService extends Document {
   category: string;
   type?: string;
   price: number;
-  duration: number;
   memberDiscount: number;
   memberPrice: number;
 }
@@ -67,7 +66,6 @@ const ServiceSchema = new Schema<IService>({
   category: { type: String, required: true },
   type: { type: String, default: "" },
   price: { type: Number, required: true },
-  duration: { type: Number, required: true },
   memberDiscount: { type: Number, default: 20 },
   memberPrice: { type: Number, default: 0 },
 });
