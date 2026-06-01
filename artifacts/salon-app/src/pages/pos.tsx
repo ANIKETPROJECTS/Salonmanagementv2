@@ -584,21 +584,37 @@ export default function POS() {
                   {autoDiscountPct}% discount will be applied automatically
                 </p>
               )}
-              {(Array.isArray(typePicker.types) ? typePicker.types.filter((v: any) => v.name) : []).map((v: any) => (
-                <button key={v.name}
-                  onClick={() => { addToCart(typePicker, Number(v.price) || 0, `${typePicker.name} — ${v.name}`); setTypePicker(null); }}
-                  className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-sidebar hover:bg-sidebar/80 transition-colors">
-                  <span className="text-sm font-semibold text-white">{v.name}</span>
-                  <div className="text-right">
-                    <span className="text-white font-bold text-sm">₹{(Number(v.price) || 0).toLocaleString("en-IN")}</span>
-                    {autoDiscountPct > 0 && (
-                      <span className="block text-[10px] text-emerald-400">
-                        after disc: ₹{Math.round((Number(v.price) || 0) * (1 - autoDiscountPct / 100)).toLocaleString("en-IN")}
-                      </span>
-                    )}
-                  </div>
-                </button>
-              ))}
+              {(Array.isArray(typePicker.types) ? typePicker.types.filter((v: any) => v.name) : []).map((v: any) => {
+                const variantName = `${typePicker.name} — ${v.name}`;
+                const alreadySelected = cart.some(
+                  (c) => c.itemId === (typePicker.id || typePicker._id) && c.name === variantName
+                );
+                return (
+                  <button key={v.name}
+                    disabled={alreadySelected}
+                    onClick={() => { addToCart(typePicker, Number(v.price) || 0, variantName); setTypePicker(null); }}
+                    className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-colors ${
+                      alreadySelected
+                        ? "bg-sidebar/40 opacity-40 cursor-not-allowed"
+                        : "bg-sidebar hover:bg-sidebar/80"
+                    }`}>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-sm font-semibold ${alreadySelected ? "text-white/50" : "text-white"}`}>{v.name}</span>
+                      {alreadySelected && (
+                        <span className="text-[10px] font-medium text-white/40 bg-white/10 px-2 py-0.5 rounded-full">Added</span>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <span className={`font-bold text-sm ${alreadySelected ? "text-white/40" : "text-white"}`}>₹{(Number(v.price) || 0).toLocaleString("en-IN")}</span>
+                      {autoDiscountPct > 0 && !alreadySelected && (
+                        <span className="block text-[10px] text-emerald-400">
+                          after disc: ₹{Math.round((Number(v.price) || 0) * (1 - autoDiscountPct / 100)).toLocaleString("en-IN")}
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
