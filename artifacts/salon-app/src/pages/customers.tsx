@@ -75,6 +75,7 @@ export default function Customers() {
   const [editPhoneError, setEditPhoneError] = useState("");
   const [editSaving, setEditSaving] = useState(false);
   const [showEditFamilySection, setShowEditFamilySection] = useState(false);
+  const [editMembershipId, setEditMembershipId] = useState("");
 
   const [deleteCustomer, setDeleteCustomer] = useState<any>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -162,6 +163,7 @@ export default function Customers() {
       })) : [],
     });
     setEditPhoneError("");
+    setEditMembershipId("");
     setShowEditFamilySection(Array.isArray(c.familyMembers) && c.familyMembers.length > 0);
   };
 
@@ -170,12 +172,22 @@ export default function Customers() {
     if (!/^\d{10}$/.test(editForm.phone)) { setEditPhoneError("Phone number must be exactly 10 digits"); return; }
     setEditSaving(true);
     try {
-      const res = await fetch(`${API_BASE}/customers/${editCustomer.id || editCustomer._id}`, {
+      const customerId = editCustomer.id || editCustomer._id;
+      const res = await fetch(`${API_BASE}/customers/${customerId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: editForm.name, phone: editForm.phone, dob: editForm.dob, anniversary: editForm.anniversary, gender: editForm.gender, familyMembers: editForm.familyMembers }),
       });
       if (!res.ok) throw new Error();
+      if (editMembershipId) {
+        try {
+          await fetch(`${API_BASE}/customer-memberships`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ customerId, membershipId: editMembershipId, startDate: format(new Date(), "yyyy-MM-dd") }),
+          });
+        } catch {}
+      }
       toast({ title: "Customer Updated", description: `${editForm.name} has been updated.` });
       setEditCustomer(null);
       refetch();
@@ -581,6 +593,41 @@ export default function Customers() {
                   className="w-full p-3 rounded-xl border bg-muted/30 focus:ring-2 focus:ring-primary/20 outline-none"
                   value={editForm.anniversary} onChange={e => setEditForm({ ...editForm, anniversary: e.target.value })} />
               </div>
+
+              {/* Membership — only show if not already assigned */}
+              {editCustomer?.activeMembership ? (
+                <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-sm">
+                  <Crown className="w-4 h-4 text-amber-500 shrink-0" />
+                  <span className="font-semibold">{editCustomer.activeMembership.membershipName}</span>
+                  <span className="text-amber-500 font-normal">· active till {editCustomer.activeMembership.endDate ? new Date(editCustomer.activeMembership.endDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"}</span>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-sm font-medium mb-1.5 text-muted-foreground">Membership <span className="text-muted-foreground/60 font-normal">(optional)</span></label>
+                  <div className="relative">
+                    <Crown className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-500 pointer-events-none" />
+                    <select
+                      className="w-full pl-9 pr-4 py-3 rounded-xl border bg-muted/30 focus:ring-2 focus:ring-primary/20 outline-none appearance-none text-sm"
+                      value={editMembershipId}
+                      onChange={e => setEditMembershipId(e.target.value)}
+                    >
+                      <option value="">— No membership —</option>
+                      {membershipPlans.map((m: any) => (
+                        <option key={m.id || m._id} value={m.id || m._id}>
+                          {m.name} — ₹{m.price?.toLocaleString()} / {m.duration} mo
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                  </div>
+                  {editMembershipId && (
+                    <p className="text-xs text-amber-600 mt-1.5 flex items-center gap-1">
+                      <Crown className="w-3 h-3" />
+                      Membership will be activated from today
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* Family Members Toggle */}
               <div className="pt-1">
