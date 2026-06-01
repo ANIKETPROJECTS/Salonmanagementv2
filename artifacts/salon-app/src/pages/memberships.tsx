@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Crown, Star, Gem, Plus, X, Check, Users, Tag, Trash2, UserPlus, Search, CalendarDays, BadgeCheck, AlertCircle } from "lucide-react";
+import { Crown, Star, Gem, Plus, X, Check, Users, Tag, Trash2, UserPlus, Search, CalendarDays, BadgeCheck, AlertCircle, Pencil } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { format, parseISO } from "date-fns";
@@ -37,6 +37,11 @@ export default function Memberships() {
   const [showCreatePlan, setShowCreatePlan] = useState(false);
   const [planForm, setPlanForm] = useState({ name: "", price: "", duration: "3", benefits: "", discountPercent: "" });
   const [planSaving, setPlanSaving] = useState(false);
+
+  // Edit active member modal
+  const [editMember, setEditMember] = useState<any | null>(null);
+  const [editForm, setEditForm] = useState({ startDate: "", endDate: "", discountPercent: "", membershipId: "", membershipName: "" });
+  const [editSaving, setEditSaving] = useState(false);
 
   // Assign modal
   const [assignPlan, setAssignPlan] = useState<any>(null);
@@ -166,6 +171,44 @@ export default function Memberships() {
       fetchActiveMembers();
     } catch {
       toast({ title: "Failed to revoke membership", variant: "destructive" });
+    }
+  };
+
+  const openEditMember = (cm: any) => {
+    setEditMember(cm);
+    setEditForm({
+      startDate: cm.startDate || "",
+      endDate: cm.endDate || "",
+      discountPercent: cm.discountPercent != null ? String(cm.discountPercent) : "",
+      membershipId: cm.membershipId || "",
+      membershipName: cm.membershipName || "",
+    });
+  };
+
+  const handleEditSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editMember) return;
+    setEditSaving(true);
+    try {
+      const res = await fetch(`${API_BASE}/customer-memberships/${editMember.id || editMember._id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          startDate: editForm.startDate,
+          endDate: editForm.endDate,
+          discountPercent: editForm.discountPercent !== "" ? Number(editForm.discountPercent) : 0,
+          membershipId: editForm.membershipId,
+          membershipName: editForm.membershipName,
+        }),
+      });
+      if (!res.ok) throw new Error();
+      toast({ title: "Membership updated" });
+      setEditMember(null);
+      fetchActiveMembers();
+    } catch {
+      toast({ title: "Failed to update membership", variant: "destructive" });
+    } finally {
+      setEditSaving(false);
     }
   };
 
@@ -377,12 +420,20 @@ export default function Memberships() {
                           </span>
                         </td>
                         <td className="py-3 px-3">
-                          <button
-                            onClick={() => handleRevoke(cm)}
-                            className="text-xs px-2.5 py-1.5 rounded-lg border border-destructive/30 text-destructive hover:bg-destructive/10 transition-colors font-medium"
-                          >
-                            Revoke
-                          </button>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              onClick={() => openEditMember(cm)}
+                              className="text-xs px-2.5 py-1.5 rounded-lg border border-border/60 hover:bg-primary/10 hover:border-primary/30 hover:text-primary transition-colors font-medium flex items-center gap-1"
+                            >
+                              <Pencil className="w-3 h-3" /> Edit
+                            </button>
+                            <button
+                              onClick={() => handleRevoke(cm)}
+                              className="text-xs px-2.5 py-1.5 rounded-lg border border-destructive/30 text-destructive hover:bg-destructive/10 transition-colors font-medium"
+                            >
+                              Revoke
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -393,6 +444,84 @@ export default function Memberships() {
           )}
         </CardContent>
       </Card>
+
+      {/* Edit Active Member Modal */}
+      {editMember && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md animate-in slide-in-from-bottom-4 duration-300">
+            <div className="flex items-center justify-between p-6 border-b border-border">
+              <div>
+                <h2 className="text-xl font-serif font-bold text-primary">Edit Membership</h2>
+                <p className="text-sm text-muted-foreground mt-0.5">{editMember.customerName}</p>
+              </div>
+              <button onClick={() => setEditMember(null)} className="w-8 h-8 rounded-full bg-muted flex items-center justify-center hover:bg-muted/80">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <form onSubmit={handleEditSave} className="p-6 space-y-4">
+              {/* Plan */}
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 block">Plan</label>
+                <select
+                  value={editForm.membershipId}
+                  onChange={e => {
+                    const selected = plans.find(p => (p.id || p._id) === e.target.value);
+                    setEditForm(f => ({
+                      ...f,
+                      membershipId: e.target.value,
+                      membershipName: selected?.name || f.membershipName,
+                      discountPercent: selected ? String(selected.discountPercent ?? "") : f.discountPercent,
+                    }));
+                  }}
+                  className="w-full p-2.5 rounded-xl border border-border bg-background text-sm focus:ring-2 focus:ring-primary/40 outline-none"
+                >
+                  {plans.map(p => (
+                    <option key={p.id || p._id} value={p.id || p._id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+              {/* Dates */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 block">Start Date</label>
+                  <input required type="date"
+                    value={editForm.startDate}
+                    onChange={e => setEditForm(f => ({ ...f, startDate: e.target.value }))}
+                    className="w-full p-2.5 rounded-xl border border-border bg-background text-sm focus:ring-2 focus:ring-primary/40 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 block">Expiry Date</label>
+                  <input required type="date"
+                    value={editForm.endDate}
+                    onChange={e => setEditForm(f => ({ ...f, endDate: e.target.value }))}
+                    className="w-full p-2.5 rounded-xl border border-border bg-background text-sm focus:ring-2 focus:ring-primary/40 outline-none"
+                  />
+                </div>
+              </div>
+              {/* Discount */}
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 block">Service Discount (%)</label>
+                <input type="number" min="0" max="100" placeholder="0"
+                  value={editForm.discountPercent}
+                  onChange={e => setEditForm(f => ({ ...f, discountPercent: e.target.value }))}
+                  className="w-full p-2.5 rounded-xl border border-border bg-background text-sm focus:ring-2 focus:ring-primary/40 outline-none"
+                />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={() => setEditMember(null)}
+                  className="flex-1 py-3 rounded-xl border border-border font-semibold text-sm hover:bg-muted transition-colors">
+                  Cancel
+                </button>
+                <button type="submit" disabled={editSaving}
+                  className="flex-1 py-3 rounded-xl bg-primary text-white font-bold text-sm disabled:opacity-50 hover:bg-primary/90 transition-colors">
+                  {editSaving ? "Saving..." : "Save Changes"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Create Plan Modal */}
       {showCreatePlan && (

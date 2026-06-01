@@ -92,6 +92,21 @@ router.get("/customer-memberships/customer/:customerId", async (req, res) => {
   res.json({ membership: { ...cm.toObject(), id: cm._id.toString() } });
 });
 
+// Update a customer membership (start/end dates, discount, plan name)
+router.patch("/customer-memberships/:id", async (req, res) => {
+  const { id } = req.params;
+  const { startDate, endDate, discountPercent, membershipName, membershipId } = req.body;
+  const update: Record<string, any> = {};
+  if (startDate !== undefined) update.startDate = startDate;
+  if (endDate !== undefined) update.endDate = endDate;
+  if (discountPercent !== undefined) update.discountPercent = Number(discountPercent);
+  if (membershipName !== undefined) update.membershipName = membershipName;
+  if (membershipId !== undefined) update.membershipId = membershipId;
+  const cm = await CustomerMembership.findByIdAndUpdate(id, update, { new: true });
+  if (!cm) return res.status(404).json({ error: "Not found" });
+  res.json({ ...cm.toObject(), id: cm._id.toString() });
+});
+
 // Revoke a customer membership
 router.delete("/customer-memberships/:id", async (req, res) => {
   const { id } = req.params;
