@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Crown, Star, Gem, Plus, X, Check, Users, Tag, Trash2, UserPlus, Search, CalendarDays, BadgeCheck, AlertCircle, Pencil } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, addMonths, subDays } from "date-fns";
 
 const API_BASE = "/api";
 
@@ -785,7 +785,7 @@ export default function Memberships() {
                 {startDate && assignPlan && (
                   <p className="text-xs text-muted-foreground mt-1">
                     Valid until: <span className="font-semibold text-foreground">
-                      {format(new Date(new Date(startDate).setMonth(new Date(startDate).getMonth() + Number(assignPlan.duration))), "dd MMM yyyy")}
+                      {format(subDays(addMonths(parseISO(startDate), Number(assignPlan.duration)), 1), "dd MMM yyyy")}
                     </span>
                   </p>
                 )}
