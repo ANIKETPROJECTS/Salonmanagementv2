@@ -59,9 +59,10 @@ export default function POS() {
   const customerRef = useRef<HTMLDivElement>(null);
   const [customerMembership, setCustomerMembership] = useState<any>(null);
   const [showAddCustomer, setShowAddCustomer] = useState(false);
-  const [addForm, setAddForm]     = useState({ name: "", phone: "", dob: "", gender: "" });
+  const [addForm, setAddForm]     = useState({ name: "", phone: "", dob: "", gender: "", anniversary: "", membershipId: "", membershipStartDate: "" });
   const [addPhoneError, setAddPhoneError] = useState("");
   const [addLoading, setAddLoading]       = useState(false);
+  const [membershipPlans, setMembershipPlans] = useState<any[]>([]);
   const [typePicker, setTypePicker]       = useState<any | null>(null);
 
   const taxPercent = taxEnabled ? taxRate : 0;
@@ -94,6 +95,10 @@ export default function POS() {
     };
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
+  }, []);
+
+  useEffect(() => {
+    fetch(`${API_BASE}/memberships`).then(r => r.json()).then(d => setMembershipPlans(d.memberships || [])).catch(() => {});
   }, []);
 
   const categories = useMemo(() => {
@@ -222,15 +227,23 @@ export default function POS() {
     try {
       const res = await fetch(`${API_BASE}/customers`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: addForm.name, phone: addForm.phone, dob: addForm.dob, gender: addForm.gender, email: "" }),
+        body: JSON.stringify({ name: addForm.name, phone: addForm.phone, dob: addForm.dob, gender: addForm.gender, anniversary: addForm.anniversary, email: "" }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         setAddPhoneError(err.error || "Failed to add customer.");
         return;
       }
-      const newC = await res.json(); await refetchCustomers(); selectCustomer(newC);
-      setShowAddCustomer(false); setAddForm({ name: "", phone: "", dob: "", gender: "" }); setAddPhoneError("");
+      const newC = await res.json();
+      if (addForm.membershipId) {
+        const today = new Date().toISOString().slice(0, 10);
+        await fetch(`${API_BASE}/customer-memberships`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ customerId: newC.id || newC._id, membershipId: addForm.membershipId, startDate: addForm.membershipStartDate || today }),
+        }).catch(() => {});
+      }
+      await refetchCustomers(); selectCustomer(newC);
+      setShowAddCustomer(false); setAddForm({ name: "", phone: "", dob: "", gender: "", anniversary: "", membershipId: "", membershipStartDate: "" }); setAddPhoneError("");
       toast({ title: "Customer Added", description: `${addForm.name} added & selected.` });
     } catch { toast({ title: "Error", description: "Failed to add customer.", variant: "destructive" }); }
     finally { setAddLoading(false); }
@@ -697,7 +710,7 @@ export default function POS() {
           <div className="rounded-3xl p-8 w-full max-w-md shadow-2xl bg-sidebar-accent border border-sidebar-border" style={poppins}>
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold text-white">New Customer</h2>
-              <button onClick={() => { setShowAddCustomer(false); setAddPhoneError(""); }}
+              <button onClick={() => { setShowAddCustomer(false); setAddPhoneError(""); setAddForm({ name: "", phone: "", dob: "", gender: "", anniversary: "", membershipId: "", membershipStartDate: "" }); }}
                 className="p-2 rounded-xl transition-colors bg-sidebar text-white/60 hover:text-white">
                 <X className="w-5 h-5" />
               </button>
@@ -736,8 +749,40 @@ export default function POS() {
                   className="w-full p-3 rounded-xl focus:outline-none border-0 bg-sidebar text-white placeholder:text-white/30 [&::-webkit-calendar-picker-indicator]:invert"
                   value={addForm.dob} onChange={e => setAddForm({ ...addForm, dob: e.target.value })} />
               </div>
+              <div>
+                <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wider text-white/60">Anniversary Date</label>
+                <input type="date"
+                  className="w-full p-3 rounded-xl focus:outline-none border-0 bg-sidebar text-white placeholder:text-white/30 [&::-webkit-calendar-picker-indicator]:invert"
+                  value={addForm.anniversary} onChange={e => setAddForm({ ...addForm, anniversary: e.target.value })} />
+              </div>
+              {membershipPlans.length > 0 && (
+                <div className="space-y-2">
+                  <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wider text-white/60">Membership <span className="opacity-50">(optional)</span></label>
+                  <select
+                    className="w-full p-3 rounded-xl focus:outline-none border-0 bg-sidebar text-white appearance-none text-sm"
+                    value={addForm.membershipId}
+                    onChange={e => setAddForm({ ...addForm, membershipId: e.target.value, membershipStartDate: "" })}
+                  >
+                    <option value="">— No membership —</option>
+                    {membershipPlans.map((m: any) => (
+                      <option key={m.id || m._id} value={m.id || m._id}>
+                        {m.name} — ₹{m.price?.toLocaleString()} / {m.duration} mo
+                      </option>
+                    ))}
+                  </select>
+                  {addForm.membershipId && (
+                    <div>
+                      <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wider text-white/60">Membership Start Date</label>
+                      <input type="date"
+                        className="w-full p-3 rounded-xl focus:outline-none border-0 bg-sidebar text-white [&::-webkit-calendar-picker-indicator]:invert"
+                        value={addForm.membershipStartDate}
+                        onChange={e => setAddForm({ ...addForm, membershipStartDate: e.target.value })} />
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => { setShowAddCustomer(false); setAddPhoneError(""); }}
+                <button type="button" onClick={() => { setShowAddCustomer(false); setAddPhoneError(""); setAddForm({ name: "", phone: "", dob: "", gender: "", anniversary: "", membershipId: "", membershipStartDate: "" }); }}
                   className="flex-1 py-3 rounded-xl font-semibold transition-colors bg-sidebar text-white hover:bg-sidebar/80">Cancel</button>
                 <button type="submit" disabled={addLoading}
                   className="flex-1 py-3 rounded-xl font-semibold text-white disabled:opacity-50 transition-all rose-gold-gradient"

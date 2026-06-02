@@ -3,14 +3,18 @@ import { Bill, Customer } from "../models/index.js";
 
 const router = Router();
 
-// Generate sequential bill number
+// Generate sequential bill number: TT{YYYYMMDD}-{seq}, sequence resets daily
 async function generateBillNumber(): Promise<string> {
-  const count = await Bill.countDocuments();
-  const num = String(count + 1).padStart(5, "0");
-  const date = new Date();
-  const yy = String(date.getFullYear()).slice(-2);
-  const mm = String(date.getMonth() + 1).padStart(2, "0");
-  return `BILL-${yy}${mm}-${num}`;
+  const now = new Date();
+  const yyyy = String(now.getFullYear());
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const dd = String(now.getDate()).padStart(2, "0");
+  const dateStr = `${yyyy}${mm}${dd}`;
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  const todayCount = await Bill.countDocuments({ createdAt: { $gte: startOfDay, $lt: endOfDay } });
+  const seq = String(todayCount + 1).padStart(2, "0");
+  return `TT${dateStr}-${seq}`;
 }
 
 router.get("/bills", async (req, res) => {

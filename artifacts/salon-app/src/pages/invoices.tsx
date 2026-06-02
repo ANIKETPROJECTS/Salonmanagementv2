@@ -200,31 +200,20 @@ export default function Invoices() {
                   <tr key={bill.id || bill._id} className="hover:bg-muted/20 transition-colors group">
                     {/* Invoice # */}
                     <td className="p-4 pl-6">
-                      <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-primary/50" />
-                        <span className="font-mono font-semibold text-sm text-primary">
-                          {bill.billNumber}
-                        </span>
-                      </div>
+                      <span className="font-mono font-semibold text-sm text-primary">
+                        {bill.billNumber}
+                      </span>
                     </td>
 
                     {/* Customer */}
                     <td className="p-4">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0">
-                          {(bill.customerName || "WI").substring(0, 2).toUpperCase()}
-                        </div>
-                        <span className="font-medium text-sm">{bill.customerName || "Walk-in"}</span>
-                      </div>
+                      <span className="font-medium text-sm">{bill.customerName || "Walk-in"}</span>
                     </td>
 
                     {/* Contact */}
                     <td className="p-4">
                       {bill.customerPhone ? (
-                        <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                          <Phone className="w-3.5 h-3.5" />
-                          {bill.customerPhone}
-                        </div>
+                        <span className="text-sm text-muted-foreground">{bill.customerPhone}</span>
                       ) : (
                         <span className="text-muted-foreground/40 text-sm italic">—</span>
                       )}
@@ -254,8 +243,8 @@ export default function Invoices() {
 
                     {/* Status */}
                     <td className="p-4">
-                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold capitalize ${bill.status === "paid" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
-                        {bill.status === "paid" ? "✓" : "⏳"} {bill.status}
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold capitalize ${bill.status === "paid" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                        {bill.status}
                       </span>
                     </td>
 

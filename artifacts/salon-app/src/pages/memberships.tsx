@@ -574,7 +574,7 @@ export default function Memberships() {
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <form onSubmit={handleEditSave} className="p-6 space-y-4">
+            <form onSubmit={handleEditSave} className="p-6 space-y-4 overflow-y-auto max-h-[70vh]">
               {/* Plan */}
               <div>
                 <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 block">Plan</label>
@@ -624,6 +624,33 @@ export default function Memberships() {
                   className="w-full p-2.5 rounded-xl border border-border bg-background text-sm focus:ring-2 focus:ring-primary/40 outline-none"
                 />
               </div>
+              {/* Sub-members (family members) */}
+              {(() => {
+                const customer = customers.find((c: any) => (c.id || c._id) === editMember?.customerId);
+                const familyMembers: any[] = Array.isArray(customer?.familyMembers) ? customer.familyMembers.filter((m: any) => m.name) : [];
+                if (familyMembers.length === 0) return null;
+                return (
+                  <div className="bg-muted/30 rounded-xl border border-border/60 p-4">
+                    <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
+                      <Users className="w-3.5 h-3.5" /> Sub-members ({familyMembers.length})
+                    </p>
+                    <div className="space-y-2">
+                      {familyMembers.map((m: any, i: number) => (
+                        <div key={i} className="flex items-center gap-2.5 bg-card rounded-lg px-3 py-2 border border-border/50">
+                          <div className="w-7 h-7 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-bold shrink-0">
+                            {m.name.substring(0, 2).toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold truncate">{m.name}</p>
+                            {m.phone && <p className="text-xs text-muted-foreground">{m.phone}</p>}
+                          </div>
+                          {m.gender && <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground capitalize">{m.gender}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setEditMember(null)}
                   className="flex-1 py-3 rounded-xl border border-border font-semibold text-sm hover:bg-muted transition-colors">
