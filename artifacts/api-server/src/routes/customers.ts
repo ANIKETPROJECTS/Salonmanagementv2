@@ -125,11 +125,21 @@ router.get("/customers", async (req, res) => {
   const familyCustomers = allCustomers.filter((c) => c.familyOf);
   let topLevelCustomers = allCustomers.filter((c) => !c.familyOf);
 
-  // Apply search filter to top-level customers only
+  // Apply search: match top-level customers directly OR parents whose family members match
   if (search && typeof search === "string") {
     const s = search.toLowerCase();
+    const directMatchIds = new Set(
+      topLevelCustomers
+        .filter((c) => c.name.toLowerCase().includes(s) || c.phone.includes(s))
+        .map((c) => c._id.toString())
+    );
+    const parentIdsOfMatchingMembers = new Set(
+      familyCustomers
+        .filter((fc) => fc.name.toLowerCase().includes(s) || fc.phone.includes(s))
+        .map((fc) => fc.familyOf!.toString())
+    );
     topLevelCustomers = topLevelCustomers.filter(
-      (c) => c.name.toLowerCase().includes(s) || c.phone.includes(s)
+      (c) => directMatchIds.has(c._id.toString()) || parentIdsOfMatchingMembers.has(c._id.toString())
     );
   }
 

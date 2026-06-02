@@ -459,28 +459,29 @@ export default function Customers() {
                   if (entry._type === "family") {
                     const m = entry.data;
                     const parent = entry.parent;
+                    const mId = m.id || m._id;
                     return (
-                      <tr key={`fm-${parent.id || parent._id}-${m.name}-${idx}`} className="hover:bg-violet-50/40 transition-colors bg-violet-50/20">
-                        <td className="p-4 pl-10">
+                      <tr key={`fm-${mId}-${idx}`} className="hover:bg-muted/20 transition-colors group">
+                        <td className="p-4 pl-6">
                           <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0 relative border-2 border-violet-200"
-                              style={{ background: m.gender === "female" ? "#fdf2f8" : m.gender === "male" ? "#eff6ff" : "#f5f3ff", color: m.gender === "female" ? "#db2777" : m.gender === "male" ? "#2563eb" : "#7c3aed" }}>
+                            <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 relative"
+                              style={{ background: m.gender === "female" ? "#fdf2f8" : m.gender === "male" ? "#eff6ff" : "hsl(var(--primary) / 0.1)", color: m.gender === "female" ? "#db2777" : m.gender === "male" ? "#2563eb" : "hsl(var(--primary))" }}>
                               {(m.name || "??").substring(0, 2).toUpperCase()}
                               {m.gender && (
-                                <span className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full text-[8px] font-bold flex items-center justify-center text-white border-[1.5px] border-card ${m.gender === "male" ? "bg-blue-500" : "bg-pink-500"}`}>
+                                <span className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center text-white border-2 border-card ${m.gender === "male" ? "bg-blue-500" : "bg-pink-500"}`}>
                                   {m.gender === "male" ? "♂" : "♀"}
                                 </span>
                               )}
                             </div>
                             <div>
-                              <p className="font-medium text-foreground text-sm">{m.name}</p>
+                              <p className="font-semibold text-foreground group-hover:text-primary transition-colors">{m.name}</p>
                               <div className="flex flex-wrap items-center gap-1 mt-0.5">
                                 <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-violet-100 text-violet-600">
                                   <Users className="w-2.5 h-2.5" /> Family of {parent.name}
                                 </span>
-                                {parent.activeMembership && (
-                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-700">
-                                    <BadgeCheck className="w-2.5 h-2.5" /> Member
+                                {m.activeMembership && (
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-violet-100 text-violet-700">
+                                    <BadgeCheck className="w-2.5 h-2.5" /> {m.activeMembership.membershipName} · till {m.activeMembership.endDate ? new Date(m.activeMembership.endDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : ""}
                                   </span>
                                 )}
                               </div>
@@ -499,14 +500,24 @@ export default function Customers() {
                             {m.dob ? format(new Date(m.dob), "dd MMM yyyy") : <span className="italic">—</span>}
                           </div>
                         </td>
-                        <td className="p-4 text-muted-foreground/40 text-sm">—</td>
-                        <td className="p-4 text-muted-foreground/40 text-sm">—</td>
+                        <td className="p-4">
+                          <span className="font-semibold text-emerald-600">
+                            ₹{Number(m.totalSpend || 0).toLocaleString("en-IN")}
+                          </span>
+                        </td>
+                        <td className="p-4">
+                          <span className="text-sm text-foreground font-medium">
+                            {m.totalVisits || 0} visits
+                          </span>
+                        </td>
                         <td className="p-4">
                           <div className="flex items-center gap-1.5">
-                            <button onClick={() => openViewSubMember(m, parent)} title="View Sub-member"
-                              className="p-2 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors">
-                              <Eye className="w-4 h-4" />
-                            </button>
+                            <Link href={`/customers/${mId}/history`}>
+                              <button title="View Visit History"
+                                className="p-2 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors">
+                                <Eye className="w-4 h-4" />
+                              </button>
+                            </Link>
                             <button onClick={() => openEditSubMember(m, parent, parent.familyMembers.findIndex((fm: any) => fm === m))} title="Edit Sub-member"
                               className="p-2 rounded-lg bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 transition-colors">
                               <Pencil className="w-4 h-4" />
