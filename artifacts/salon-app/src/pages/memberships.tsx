@@ -56,6 +56,9 @@ export default function Memberships() {
   const [startDate, setStartDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [assignSaving, setAssignSaving] = useState(false);
 
+  // New sub-members being added inside Assign modal
+  const [assignNewMembers, setAssignNewMembers] = useState<NewFM[]>([]);
+
   // Edit sub-member modal
   const [editSubMember, setEditSubMember] = useState<{ cm: any; member: any; idx: number } | null>(null);
   const [editSubMemberForm, setEditSubMemberForm] = useState({ name: "", phone: "", gender: "", dob: "", anniversary: "" });
@@ -209,12 +212,29 @@ export default function Memberships() {
         }),
       });
       if (!res.ok) throw new Error();
+
+      // Save any new sub-members added during assign
+      const validNew = assignNewMembers.filter(m => m.name.trim());
+      if (validNew.length > 0) {
+        const existing: any[] = Array.isArray(selectedCustomer.familyMembers) ? selectedCustomer.familyMembers : [];
+        const merged = [...existing, ...validNew.map(m => ({
+          name: m.name.trim(), phone: m.phone.trim(), gender: m.gender, dob: m.dob, anniversary: m.anniversary,
+        }))];
+        await fetch(`${API_BASE}/customers/${selectedCustomer.id || selectedCustomer._id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ familyMembers: merged }),
+        });
+      }
+
       toast({ title: "Membership assigned!", description: `${selectedCustomer.name} is now on ${assignPlan.name}` });
       setAssignPlan(null);
       setSelectedCustomer(null);
       setCustomerSearch("");
       setStartDate(format(new Date(), "yyyy-MM-dd"));
+      setAssignNewMembers([]);
       fetchActiveMembers();
+      fetchCustomers();
     } catch {
       toast({ title: "Failed to assign membership", variant: "destructive" });
     } finally {
@@ -349,18 +369,21 @@ export default function Memberships() {
     );
   }, [customers, customerSearch]);
 
-  // Build a set of family-member IDs so we can exclude them from Active Members list
-  // (they're already shown as "covered" sub-members under their parent's row)
-  const familyMemberIdSet = useMemo(() => {
-    const s = new Set<string>();
-    customers.forEach((c: any) => {
-      (c.familyMembers || []).forEach((m: any) => {
-        const id = m.id || m._id;
-        if (id) s.add(id);
-      });
+  // Build a set of customer names that are already covered as sub-members under another member's plan.
+  // We match by name because sub-members stored as embedded family member objects don't share
+  // the same ID as their customer-membership record's customerId.
+  const coveredFamilyMemberNames = useMemo(() => {
+    const names = new Set<string>();
+    activeMembers.forEach((cm: any) => {
+      const customer = customers.find((c: any) => (c.id || c._id) === cm.customerId);
+      if (customer) {
+        (customer.familyMembers || []).forEach((m: any) => {
+          if (m.name) names.add(m.name.toLowerCase().trim());
+        });
+      }
     });
-    return s;
-  }, [customers]);
+    return names;
+  }, [customers, activeMembers]);
 
   const today = format(new Date(), "yyyy-MM-dd");
 
@@ -496,7 +519,7 @@ export default function Memberships() {
                         {memberCount} active member{memberCount !== 1 ? "s" : ""}
                       </span>
                       <button
-                        onClick={() => { setAssignPlan(plan); setSelectedCustomer(null); setCustomerSearch(""); setStartDate(format(new Date(), "yyyy-MM-dd")); }}
+                        onClick={() => { setAssignPlan(plan); setSelectedCustomer(null); setCustomerSearch(""); setStartDate(format(new Date(), "yyyy-MM-dd")); setAssignNewMembers([]); }}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors text-xs font-semibold"
                       >
                         <UserPlus className="w-3.5 h-3.5" /> Assign to Client
@@ -524,7 +547,7 @@ export default function Memberships() {
             </div>
           ) : (
             <div className="space-y-3">
-              {activeMembers.filter((cm: any) => !familyMemberIdSet.has(cm.customerId)).map((cm: any) => {
+              {activeMembers.filter((cm: any) => !coveredFamilyMemberNames.has(cm.customerName?.toLowerCase().trim())).map((cm: any) => {
                 const isExpiringSoon = cm.endDate <= format(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), "yyyy-MM-dd");
                 const customer = customers.find((c: any) => (c.id || c._id) === cm.customerId);
                 const familyMembers: any[] = Array.isArray(customer?.familyMembers) ? customer.familyMembers.filter((m: any) => m.name) : [];
@@ -1010,31 +1033,82 @@ export default function Memberships() {
                 )}
               </div>
 
-              {/* Sub-members preview (shown after customer selected) */}
+              {/* Sub-members section (shown after customer selected) */}
               {selectedCustomer && (() => {
-                const fm: any[] = Array.isArray(selectedCustomer.familyMembers)
+                const existingFm: any[] = Array.isArray(selectedCustomer.familyMembers)
                   ? selectedCustomer.familyMembers.filter((m: any) => m.name)
                   : [];
-                if (fm.length === 0) return null;
+                const totalSubs = existingFm.length + assignNewMembers.filter(m => m.name.trim()).length;
                 return (
-                  <div className="bg-muted/30 rounded-xl border border-border/60 p-3">
-                    <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
-                      <Users className="w-3.5 h-3.5" /> Sub-members covered by this membership ({fm.length})
+                  <div className="bg-muted/30 rounded-xl border border-border/60 p-4">
+                    <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
+                      <Users className="w-3.5 h-3.5" /> Sub-members ({totalSubs}/4)
                     </p>
-                    <div className="space-y-1.5">
-                      {fm.map((m: any, i: number) => (
-                        <div key={i} className="flex items-center gap-2.5 bg-card rounded-lg px-3 py-2 border border-border/50">
-                          <div className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-bold shrink-0">
-                            {m.name.substring(0, 2).toUpperCase()}
+                    {/* Existing sub-members */}
+                    {existingFm.length > 0 && (
+                      <div className="space-y-2 mb-3">
+                        {existingFm.map((m: any, i: number) => (
+                          <div key={i} className="flex items-center gap-2.5 bg-card rounded-lg px-3 py-2 border border-border/50">
+                            <div className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-bold shrink-0">
+                              {m.name.substring(0, 2).toUpperCase()}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-semibold truncate">{m.name}</p>
+                              {m.phone && <p className="text-[11px] text-muted-foreground">{m.phone}</p>}
+                            </div>
+                            {m.gender && <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground capitalize shrink-0">{m.gender}</span>}
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs font-semibold truncate">{m.name}</p>
-                            {m.phone && <p className="text-[11px] text-muted-foreground">{m.phone}</p>}
-                          </div>
-                          {m.gender && <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground capitalize shrink-0">{m.gender}</span>}
+                        ))}
+                      </div>
+                    )}
+                    {/* New sub-members being added */}
+                    {assignNewMembers.map((nm, ni) => (
+                      <div key={ni} className="bg-card border border-primary/30 rounded-xl p-3 mb-2 space-y-2">
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-xs font-semibold text-primary">New Sub-member {existingFm.length + ni + 1}</p>
+                          <button type="button" onClick={() => setAssignNewMembers(prev => prev.filter((_, ii) => ii !== ni))}
+                            className="text-xs text-destructive hover:underline">Remove</button>
                         </div>
-                      ))}
-                    </div>
+                        <input required type="text" placeholder="Name *" value={nm.name}
+                          onChange={e => setAssignNewMembers(prev => prev.map((x, ii) => ii === ni ? { ...x, name: e.target.value } : x))}
+                          className="w-full p-2 rounded-lg border border-border bg-background text-sm focus:ring-2 focus:ring-primary/40 outline-none" />
+                        <div className="grid grid-cols-2 gap-2">
+                          <input type="tel" placeholder="Phone" value={nm.phone}
+                            onChange={e => setAssignNewMembers(prev => prev.map((x, ii) => ii === ni ? { ...x, phone: e.target.value.replace(/\D/g, "").slice(0, 10) } : x))}
+                            className="p-2 rounded-lg border border-border bg-background text-sm focus:ring-2 focus:ring-primary/40 outline-none" />
+                          <select value={nm.gender}
+                            onChange={e => setAssignNewMembers(prev => prev.map((x, ii) => ii === ni ? { ...x, gender: e.target.value } : x))}
+                            className="p-2 rounded-lg border border-border bg-background text-sm focus:ring-2 focus:ring-primary/40 outline-none">
+                            <option value="">Gender</option>
+                            <option value="female">Female</option>
+                            <option value="male">Male</option>
+                          </select>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-[10px] text-muted-foreground uppercase tracking-wide block mb-0.5">Date of Birth</label>
+                            <input type="date" value={nm.dob}
+                              onChange={e => setAssignNewMembers(prev => prev.map((x, ii) => ii === ni ? { ...x, dob: e.target.value } : x))}
+                              className="w-full p-2 rounded-lg border border-border bg-background text-sm focus:ring-2 focus:ring-primary/40 outline-none" />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-muted-foreground uppercase tracking-wide block mb-0.5">Anniversary</label>
+                            <input type="date" value={nm.anniversary}
+                              onChange={e => setAssignNewMembers(prev => prev.map((x, ii) => ii === ni ? { ...x, anniversary: e.target.value } : x))}
+                              className="w-full p-2 rounded-lg border border-border bg-background text-sm focus:ring-2 focus:ring-primary/40 outline-none" />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    {totalSubs < 4 ? (
+                      <button type="button"
+                        onClick={() => setAssignNewMembers(prev => [...prev, { name: "", phone: "", gender: "", dob: "", anniversary: "" }])}
+                        className="w-full py-2 rounded-xl border border-dashed border-primary/50 text-primary text-xs font-semibold hover:bg-primary/5 transition-colors flex items-center justify-center gap-1.5 mt-1">
+                        <Plus className="w-3.5 h-3.5" /> Add Sub-member
+                      </button>
+                    ) : (
+                      <p className="text-xs text-muted-foreground text-center py-2 bg-muted/30 rounded-xl mt-1">Maximum 4 sub-members allowed</p>
+                    )}
                   </div>
                 );
               })()}

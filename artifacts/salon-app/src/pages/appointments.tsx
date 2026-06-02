@@ -120,6 +120,7 @@ function AddCustomerModal({ onClose, onSaved }: {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     if (!validatePhone(form.phone)) return;
     setSaving(true);
     try {
@@ -278,11 +279,15 @@ function AddCustomerModal({ onClose, onSaved }: {
                     </div>
                   </div>
                 ))}
-                <button type="button"
-                  onClick={() => setFamilyMembers(prev => [...prev, { ...EMPTY_FM }])}
-                  className="w-full py-2.5 rounded-xl border border-dashed border-primary/40 text-primary text-xs font-semibold hover:bg-primary/5 transition-colors flex items-center justify-center gap-1.5">
-                  <Plus className="w-3.5 h-3.5" /> Add Family Member
-                </button>
+                {familyMembers.length < 4 ? (
+                  <button type="button"
+                    onClick={() => setFamilyMembers(prev => [...prev, { ...EMPTY_FM }])}
+                    className="w-full py-2.5 rounded-xl border border-dashed border-primary/40 text-primary text-xs font-semibold hover:bg-primary/5 transition-colors flex items-center justify-center gap-1.5">
+                    <Plus className="w-3.5 h-3.5" /> Add Family Member
+                  </button>
+                ) : (
+                  <p className="text-xs text-muted-foreground text-center py-2 bg-muted/30 rounded-xl">Maximum 4 sub-members allowed</p>
+                )}
               </div>
             )}
           </div>
