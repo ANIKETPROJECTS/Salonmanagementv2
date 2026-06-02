@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Crown, Star, Gem, Plus, X, Check, Users, Tag, Trash2, UserPlus, Search, CalendarDays, BadgeCheck, AlertCircle, Pencil } from "lucide-react";
+import { Crown, Star, Gem, Plus, X, Check, Users, Tag, Trash2, UserPlus, Search, CalendarDays, BadgeCheck, AlertCircle, Pencil, Eye, ChevronDown, ChevronRight } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { format, parseISO, addMonths, subDays } from "date-fns";
@@ -55,6 +55,12 @@ export default function Memberships() {
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
   const [startDate, setStartDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [assignSaving, setAssignSaving] = useState(false);
+
+  // View member modal
+  const [viewMember, setViewMember] = useState<any | null>(null);
+
+  // Expanded rows in Active Members table
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
   const fetchPlans = async () => {
     setPlansLoading(true);
@@ -411,7 +417,7 @@ export default function Memberships() {
         )}
       </div>
 
-      {/* Active Members Table */}
+      {/* Active Members List */}
       <Card className="rounded-2xl border-border/50 shadow-lg">
         <CardContent className="p-6">
           <h2 className="text-lg font-bold font-serif text-foreground mb-4">Active Members</h2>
@@ -424,74 +430,132 @@ export default function Memberships() {
               <p className="text-sm mt-1">Assign a plan to a client to see them here</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border/50">
-                    {["Customer", "Plan", "Discount", "Start Date", "Expiry", "Status", "Actions"].map(h => (
-                      <th key={h} className="text-left py-3 px-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/40">
-                  {activeMembers.map((cm: any) => {
-                    const isExpiringSoon = cm.endDate <= format(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), "yyyy-MM-dd");
-                    return (
-                      <tr key={cm.id || cm._id} className="hover:bg-muted/20 transition-colors">
-                        <td className="py-3 px-3">
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">
-                              {cm.customerName.substring(0, 2).toUpperCase()}
-                            </div>
-                            <span className="font-semibold text-foreground">{cm.customerName}</span>
-                          </div>
-                        </td>
-                        <td className="py-3 px-3">
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-violet-100 text-violet-700">
+            <div className="space-y-3">
+              {activeMembers.map((cm: any) => {
+                const isExpiringSoon = cm.endDate <= format(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), "yyyy-MM-dd");
+                const customer = customers.find((c: any) => (c.id || c._id) === cm.customerId);
+                const familyMembers: any[] = Array.isArray(customer?.familyMembers) ? customer.familyMembers.filter((m: any) => m.name) : [];
+                const rowId = cm.id || cm._id;
+                const isExpanded = expandedRows.has(rowId);
+
+                return (
+                  <div key={rowId} className="rounded-2xl border border-border/60 overflow-hidden bg-card shadow-sm hover:shadow-md transition-shadow">
+                    {/* Parent Member Row */}
+                    <div className="flex items-center gap-3 p-4">
+                      {/* Expand toggle */}
+                      <button
+                        type="button"
+                        onClick={() => setExpandedRows(prev => {
+                          const next = new Set(prev);
+                          if (next.has(rowId)) next.delete(rowId); else next.add(rowId);
+                          return next;
+                        })}
+                        className="w-6 h-6 flex items-center justify-center text-muted-foreground hover:text-primary transition-colors shrink-0"
+                        title={familyMembers.length > 0 ? (isExpanded ? "Collapse sub-members" : "Expand sub-members") : "No sub-members"}
+                      >
+                        {familyMembers.length > 0
+                          ? (isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />)
+                          : <span className="w-4 h-4 block" />
+                        }
+                      </button>
+
+                      {/* Avatar */}
+                      <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">
+                        {cm.customerName.substring(0, 2).toUpperCase()}
+                      </div>
+
+                      {/* Name + plan */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold text-foreground text-sm">{cm.customerName}</span>
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-violet-100 text-violet-700">
                             <BadgeCheck className="w-3 h-3" /> {cm.membershipName}
                           </span>
-                        </td>
-                        <td className="py-3 px-3">
-                          {cm.discountPercent > 0
-                            ? <span className="text-secondary font-semibold">{cm.discountPercent}% off</span>
-                            : <span className="text-muted-foreground">—</span>
-                          }
-                        </td>
-                        <td className="py-3 px-3 text-muted-foreground text-xs">
-                          {cm.startDate ? format(parseISO(cm.startDate), "dd MMM yyyy") : "—"}
-                        </td>
-                        <td className="py-3 px-3 text-xs">
-                          <span className={isExpiringSoon ? "text-amber-600 font-semibold" : "text-muted-foreground"}>
-                            {cm.endDate ? format(parseISO(cm.endDate), "dd MMM yyyy") : "—"}
-                            {isExpiringSoon && " ⚠"}
+                          {familyMembers.length > 0 && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-muted text-muted-foreground border border-border/60">
+                              <Users className="w-3 h-3" /> {familyMembers.length} sub-member{familyMembers.length !== 1 ? "s" : ""}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                          {cm.discountPercent > 0 && (
+                            <span className="text-xs text-secondary font-semibold">{cm.discountPercent}% off</span>
+                          )}
+                          <span className="text-xs text-muted-foreground">
+                            {cm.startDate ? format(parseISO(cm.startDate), "dd MMM yyyy") : "—"} → {" "}
+                            <span className={isExpiringSoon ? "text-amber-600 font-semibold" : ""}>
+                              {cm.endDate ? format(parseISO(cm.endDate), "dd MMM yyyy") : "—"}
+                              {isExpiringSoon && " ⚠"}
+                            </span>
                           </span>
-                        </td>
-                        <td className="py-3 px-3">
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">
-                            <Check className="w-3 h-3" /> Active
-                          </span>
-                        </td>
-                        <td className="py-3 px-3">
-                          <div className="flex items-center gap-1.5">
+                        </div>
+                      </div>
+
+                      {/* Status */}
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 shrink-0">
+                        <Check className="w-3 h-3" /> Active
+                      </span>
+
+                      {/* Actions */}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          onClick={() => setViewMember(cm)}
+                          className="text-xs px-2.5 py-1.5 rounded-lg border border-border/60 hover:bg-violet-50 hover:border-violet-300 hover:text-violet-700 transition-colors font-medium flex items-center gap-1"
+                          title="View details"
+                        >
+                          <Eye className="w-3 h-3" /> View
+                        </button>
+                        <button
+                          onClick={() => openEditMember(cm)}
+                          className="text-xs px-2.5 py-1.5 rounded-lg border border-border/60 hover:bg-primary/10 hover:border-primary/30 hover:text-primary transition-colors font-medium flex items-center gap-1"
+                        >
+                          <Pencil className="w-3 h-3" /> Edit
+                        </button>
+                        <button
+                          onClick={() => handleRevoke(cm)}
+                          className="text-xs px-2.5 py-1.5 rounded-lg border border-destructive/30 text-destructive hover:bg-destructive/10 transition-colors font-medium"
+                        >
+                          Revoke
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Sub-members expanded */}
+                    {isExpanded && familyMembers.length > 0 && (
+                      <div className="border-t border-border/50 bg-muted/20 px-4 py-3 space-y-2">
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
+                          <Users className="w-3.5 h-3.5" /> Sub-members
+                        </p>
+                        {familyMembers.map((m: any, idx: number) => (
+                          <div key={idx} className="flex items-center gap-3 bg-card rounded-xl px-3 py-2.5 border border-border/50">
+                            <div className="w-7 h-7 rounded-full bg-violet-100 text-violet-700 flex items-center justify-center text-[10px] font-bold shrink-0">
+                              {m.name.substring(0, 2).toUpperCase()}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-semibold text-foreground">{m.name}</p>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                {m.phone && <span className="text-xs text-muted-foreground">{m.phone}</span>}
+                                {m.gender && <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground capitalize">{m.gender}</span>}
+                                {m.dob && <span className="text-[10px] text-muted-foreground">DOB: {m.dob}</span>}
+                              </div>
+                            </div>
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-violet-100 text-violet-700 shrink-0">
+                              <BadgeCheck className="w-3 h-3" /> Covered
+                            </span>
                             <button
-                              onClick={() => openEditMember(cm)}
-                              className="text-xs px-2.5 py-1.5 rounded-lg border border-border/60 hover:bg-primary/10 hover:border-primary/30 hover:text-primary transition-colors font-medium flex items-center gap-1"
+                              onClick={() => openEditMember({ ...cm, _editSubMember: m, _subMemberIdx: idx })}
+                              className="text-xs px-2 py-1 rounded-lg border border-border/60 hover:bg-primary/10 hover:text-primary transition-colors font-medium flex items-center gap-1 shrink-0"
+                              title="Edit sub-member"
                             >
                               <Pencil className="w-3 h-3" /> Edit
                             </button>
-                            <button
-                              onClick={() => handleRevoke(cm)}
-                              className="text-xs px-2.5 py-1.5 rounded-lg border border-destructive/30 text-destructive hover:bg-destructive/10 transition-colors font-medium"
-                            >
-                              Revoke
-                            </button>
                           </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </CardContent>
@@ -726,8 +790,8 @@ export default function Memberships() {
       {/* Assign Modal */}
       {assignPlan && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md animate-in slide-in-from-bottom-4 duration-300">
-            <div className="flex items-center justify-between p-6 border-b border-border">
+          <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md animate-in slide-in-from-bottom-4 duration-300 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between p-6 border-b border-border shrink-0">
               <div>
                 <h2 className="text-xl font-serif font-bold text-primary">Assign Membership</h2>
                 <p className="text-sm text-muted-foreground mt-0.5">Plan: <span className="font-semibold text-foreground">{assignPlan.name}</span> · ₹{Number(assignPlan.price).toLocaleString("en-IN")} · {assignPlan.duration} months</p>
@@ -736,7 +800,7 @@ export default function Memberships() {
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <form onSubmit={handleAssign} className="p-6 space-y-4">
+            <form onSubmit={handleAssign} className="p-6 space-y-4 overflow-y-auto flex-1">
               {/* Customer search */}
               <div>
                 <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 block">Select Customer *</label>
@@ -770,7 +834,7 @@ export default function Memberships() {
                       {filteredCustomers.length === 0 ? (
                         <p className="text-center py-4 text-sm text-muted-foreground">No customers found</p>
                       ) : (
-                        filteredCustomers.slice(0, 5).map((c: any) => (
+                        filteredCustomers.slice(0, 10).map((c: any) => (
                           <button
                             key={c.id || c._id}
                             type="button"
@@ -782,7 +846,14 @@ export default function Memberships() {
                             </div>
                             <div className="flex-1">
                               <p className="text-sm font-medium">{c.name}</p>
-                              <p className="text-xs text-muted-foreground">{c.phone}</p>
+                              <div className="flex items-center gap-2">
+                                <p className="text-xs text-muted-foreground">{c.phone}</p>
+                                {Array.isArray(c.familyMembers) && c.familyMembers.filter((m: any) => m.name).length > 0 && (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">
+                                    {c.familyMembers.filter((m: any) => m.name).length} sub-member{c.familyMembers.filter((m: any) => m.name).length !== 1 ? "s" : ""}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                             {c.activeMembership && (
                               <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 font-medium">
@@ -796,6 +867,35 @@ export default function Memberships() {
                   </>
                 )}
               </div>
+
+              {/* Sub-members preview (shown after customer selected) */}
+              {selectedCustomer && (() => {
+                const fm: any[] = Array.isArray(selectedCustomer.familyMembers)
+                  ? selectedCustomer.familyMembers.filter((m: any) => m.name)
+                  : [];
+                if (fm.length === 0) return null;
+                return (
+                  <div className="bg-muted/30 rounded-xl border border-border/60 p-3">
+                    <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
+                      <Users className="w-3.5 h-3.5" /> Sub-members covered by this membership ({fm.length})
+                    </p>
+                    <div className="space-y-1.5">
+                      {fm.map((m: any, i: number) => (
+                        <div key={i} className="flex items-center gap-2.5 bg-card rounded-lg px-3 py-2 border border-border/50">
+                          <div className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-bold shrink-0">
+                            {m.name.substring(0, 2).toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-semibold truncate">{m.name}</p>
+                            {m.phone && <p className="text-[11px] text-muted-foreground">{m.phone}</p>}
+                          </div>
+                          {m.gender && <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground capitalize shrink-0">{m.gender}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Start Date */}
               <div>
@@ -829,6 +929,124 @@ export default function Memberships() {
           </div>
         </div>
       )}
+
+      {/* View Member Modal */}
+      {viewMember && (() => {
+        const customer = customers.find((c: any) => (c.id || c._id) === viewMember.customerId);
+        const familyMembers: any[] = Array.isArray(customer?.familyMembers) ? customer.familyMembers.filter((m: any) => m.name) : [];
+        const isExpiringSoon = viewMember.endDate <= format(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), "yyyy-MM-dd");
+        return (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md animate-in slide-in-from-bottom-4 duration-300 max-h-[90vh] flex flex-col">
+              <div className="flex items-center justify-between p-6 border-b border-border shrink-0">
+                <div>
+                  <h2 className="text-xl font-serif font-bold text-primary">Membership Details</h2>
+                  <p className="text-sm text-muted-foreground mt-0.5">{viewMember.customerName}</p>
+                </div>
+                <button onClick={() => setViewMember(null)} className="w-8 h-8 rounded-full bg-muted flex items-center justify-center hover:bg-muted/80">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="p-6 space-y-4 overflow-y-auto flex-1">
+                {/* Plan info */}
+                <div className="bg-violet-50 border border-violet-200 rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold bg-violet-100 text-violet-700">
+                      <BadgeCheck className="w-4 h-4" /> {viewMember.membershipName}
+                    </span>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">
+                      <Check className="w-3 h-3" /> Active
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold mb-0.5">Start Date</p>
+                      <p className="font-semibold">{viewMember.startDate ? format(parseISO(viewMember.startDate), "dd MMM yyyy") : "—"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold mb-0.5">Expiry</p>
+                      <p className={`font-semibold ${isExpiringSoon ? "text-amber-600" : ""}`}>
+                        {viewMember.endDate ? format(parseISO(viewMember.endDate), "dd MMM yyyy") : "—"}
+                        {isExpiringSoon && " ⚠"}
+                      </p>
+                    </div>
+                    {viewMember.discountPercent > 0 && (
+                      <div className="col-span-2">
+                        <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold mb-0.5">Service Discount</p>
+                        <p className="font-semibold text-secondary">{viewMember.discountPercent}% off all services</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Parent member info */}
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Parent Member</p>
+                  <div className="flex items-center gap-3 bg-muted/30 rounded-xl px-4 py-3 border border-border/50">
+                    <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">
+                      {viewMember.customerName.substring(0, 2).toUpperCase()}
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-semibold text-sm">{viewMember.customerName}</p>
+                      {customer?.phone && <p className="text-xs text-muted-foreground">{customer.phone}</p>}
+                      {customer?.gender && <p className="text-xs text-muted-foreground capitalize">{customer.gender}</p>}
+                    </div>
+                    <button
+                      onClick={() => { setViewMember(null); openEditMember(viewMember); }}
+                      className="text-xs px-2.5 py-1.5 rounded-lg border border-border/60 hover:bg-primary/10 hover:text-primary transition-colors font-medium flex items-center gap-1 shrink-0"
+                    >
+                      <Pencil className="w-3 h-3" /> Edit
+                    </button>
+                  </div>
+                </div>
+
+                {/* Sub-members */}
+                {familyMembers.length > 0 && (
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
+                      <Users className="w-3.5 h-3.5" /> Sub-members ({familyMembers.length})
+                    </p>
+                    <div className="space-y-2">
+                      {familyMembers.map((m: any, idx: number) => (
+                        <div key={idx} className="flex items-center gap-3 bg-card rounded-xl px-4 py-3 border border-border/50">
+                          <div className="w-8 h-8 rounded-full bg-violet-100 text-violet-700 flex items-center justify-center text-[10px] font-bold shrink-0">
+                            {m.name.substring(0, 2).toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-sm">{m.name}</p>
+                            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                              {m.phone && <span className="text-xs text-muted-foreground">{m.phone}</span>}
+                              {m.gender && <span className="text-[11px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground capitalize">{m.gender}</span>}
+                              {m.dob && <span className="text-[11px] text-muted-foreground">DOB: {m.dob}</span>}
+                              {m.anniversary && <span className="text-[11px] text-muted-foreground">Anniv: {m.anniversary}</span>}
+                            </div>
+                          </div>
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-violet-100 text-violet-700 shrink-0">
+                            <BadgeCheck className="w-3 h-3" /> Covered
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {familyMembers.length === 0 && (
+                  <div className="text-center py-4 text-muted-foreground text-sm bg-muted/20 rounded-xl border border-dashed border-border">
+                    <Users className="w-8 h-8 mx-auto opacity-20 mb-1.5" />
+                    No sub-members added for this customer
+                  </div>
+                )}
+              </div>
+              <div className="p-6 border-t border-border shrink-0">
+                <button onClick={() => setViewMember(null)}
+                  className="w-full py-3 rounded-xl border border-border font-semibold text-sm hover:bg-muted transition-colors">
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

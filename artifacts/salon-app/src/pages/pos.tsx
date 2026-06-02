@@ -3,7 +3,7 @@ import { useListServices, useListProducts, useListCustomers, useListStaff, useCr
 import {
   Search, Trash2, Receipt, CreditCard, Banknote, Smartphone,
   ChevronLeft, Wallet, UserPlus, X, Scissors, Package, Clock,
-  ChevronDown, UserCircle2, Tag, Check, BadgeCheck
+  ChevronDown, UserCircle2, Tag, Check, BadgeCheck, Users, Plus
 } from "lucide-react";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -59,7 +59,11 @@ export default function POS() {
   const customerRef = useRef<HTMLDivElement>(null);
   const [customerMembership, setCustomerMembership] = useState<any>(null);
   const [showAddCustomer, setShowAddCustomer] = useState(false);
-  const [addForm, setAddForm]     = useState({ name: "", phone: "", dob: "", gender: "", anniversary: "", membershipId: "", membershipStartDate: "" });
+  type POSFamilyMember = { name: string; gender: string; phone: string; dob: string; anniversary: string };
+  const EMPTY_POS_MEMBER: POSFamilyMember = { name: "", gender: "", phone: "", dob: "", anniversary: "" };
+  const MAX_POS_FAMILY = 4;
+  const [addForm, setAddForm]     = useState<{ name: string; phone: string; dob: string; gender: string; anniversary: string; membershipId: string; membershipStartDate: string; familyMembers: POSFamilyMember[] }>({ name: "", phone: "", dob: "", gender: "", anniversary: "", membershipId: "", membershipStartDate: "", familyMembers: [] });
+  const [showPOSFamilySection, setShowPOSFamilySection] = useState(false);
   const [addPhoneError, setAddPhoneError] = useState("");
   const [addLoading, setAddLoading]       = useState(false);
   const [membershipPlans, setMembershipPlans] = useState<any[]>([]);
@@ -220,14 +224,21 @@ export default function POS() {
     setShowCustomerDropdown(false); setCustomerSearch(""); setCustomerMembership(null);
   };
 
+  const resetAddForm = () => {
+    setAddForm({ name: "", phone: "", dob: "", gender: "", anniversary: "", membershipId: "", membershipStartDate: "", familyMembers: [] });
+    setShowPOSFamilySection(false);
+    setAddPhoneError("");
+  };
+
   const handleAddCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!/^\d{10}$/.test(addForm.phone)) { setAddPhoneError("Phone must be exactly 10 digits"); return; }
     setAddLoading(true);
     try {
+      const validFamilyMembers = addForm.familyMembers.filter(m => m.name.trim());
       const res = await fetch(`${API_BASE}/customers`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: addForm.name, phone: addForm.phone, dob: addForm.dob, gender: addForm.gender, anniversary: addForm.anniversary, email: "" }),
+        body: JSON.stringify({ name: addForm.name, phone: addForm.phone, dob: addForm.dob, gender: addForm.gender, anniversary: addForm.anniversary, email: "", familyMembers: validFamilyMembers }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -243,7 +254,7 @@ export default function POS() {
         }).catch(() => {});
       }
       await refetchCustomers(); selectCustomer(newC);
-      setShowAddCustomer(false); setAddForm({ name: "", phone: "", dob: "", gender: "", anniversary: "", membershipId: "", membershipStartDate: "" }); setAddPhoneError("");
+      setShowAddCustomer(false); resetAddForm();
       toast({ title: "Customer Added", description: `${addForm.name} added & selected.` });
     } catch { toast({ title: "Error", description: "Failed to add customer.", variant: "destructive" }); }
     finally { setAddLoading(false); }
@@ -707,15 +718,15 @@ export default function POS() {
       {/* ══════════════ Add Customer Modal ══════════════ */}
       {showAddCustomer && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in">
-          <div className="rounded-3xl p-8 w-full max-w-md shadow-2xl bg-sidebar-accent border border-sidebar-border" style={poppins}>
-            <div className="flex items-center justify-between mb-6">
+          <div className="rounded-3xl w-full max-w-md shadow-2xl bg-sidebar-accent border border-sidebar-border flex flex-col max-h-[90vh]" style={poppins}>
+            <div className="flex items-center justify-between px-8 pt-8 pb-4 shrink-0">
               <h2 className="text-2xl font-bold text-white">New Customer</h2>
-              <button onClick={() => { setShowAddCustomer(false); setAddPhoneError(""); setAddForm({ name: "", phone: "", dob: "", gender: "", anniversary: "", membershipId: "", membershipStartDate: "" }); }}
+              <button onClick={() => { setShowAddCustomer(false); resetAddForm(); }}
                 className="p-2 rounded-xl transition-colors bg-sidebar text-white/60 hover:text-white">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <form onSubmit={handleAddCustomer} className="space-y-4">
+            <form onSubmit={handleAddCustomer} className="px-8 pb-8 space-y-4 overflow-y-auto flex-1">
               <div>
                 <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wider text-white/60">Full Name *</label>
                 <input required type="text" placeholder="Enter full name"
@@ -755,6 +766,8 @@ export default function POS() {
                   className="w-full p-3 rounded-xl focus:outline-none border-0 bg-sidebar text-white placeholder:text-white/30 [&::-webkit-calendar-picker-indicator]:invert"
                   value={addForm.anniversary} onChange={e => setAddForm({ ...addForm, anniversary: e.target.value })} />
               </div>
+
+              {/* Membership */}
               {membershipPlans.length > 0 && (
                 <div className="space-y-2">
                   <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wider text-white/60">Membership <span className="opacity-50">(optional)</span></label>
@@ -781,8 +794,101 @@ export default function POS() {
                   )}
                 </div>
               )}
+
+              {/* Family Members */}
+              <div className="border border-sidebar-border rounded-2xl overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!showPOSFamilySection) {
+                      setShowPOSFamilySection(true);
+                      if (addForm.familyMembers.length === 0) setAddForm(f => ({ ...f, familyMembers: [{ ...EMPTY_POS_MEMBER }] }));
+                    } else {
+                      setShowPOSFamilySection(false);
+                    }
+                  }}
+                  className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-white/80 hover:text-white transition-colors bg-sidebar/50"
+                >
+                  <span className="flex items-center gap-2">
+                    <Users className="w-4 h-4" />
+                    {showPOSFamilySection ? "Hide Family Members" : `Family Members${addForm.familyMembers.length > 0 ? ` (${addForm.familyMembers.length})` : ""}`}
+                  </span>
+                  <ChevronDown className={`w-4 h-4 transition-transform ${showPOSFamilySection ? "rotate-180" : ""}`} />
+                </button>
+
+                {showPOSFamilySection && (
+                  <div className="p-4 space-y-3 bg-sidebar/30">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-white/60 font-semibold uppercase tracking-wider">Family Members <span className="opacity-60">(up to {MAX_POS_FAMILY})</span></p>
+                      {addForm.familyMembers.length < MAX_POS_FAMILY && (
+                        <button type="button"
+                          onClick={() => setAddForm(f => ({ ...f, familyMembers: [...f.familyMembers, { ...EMPTY_POS_MEMBER }] }))}
+                          className="flex items-center gap-1 text-xs font-semibold text-sidebar-primary hover:opacity-80 transition-opacity">
+                          <Plus className="w-3.5 h-3.5" /> Add Member
+                        </button>
+                      )}
+                    </div>
+                    {addForm.familyMembers.map((m, idx) => (
+                      <div key={idx} className="bg-sidebar rounded-xl p-3 border border-sidebar-border space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-white/50 uppercase tracking-wider">Member {idx + 1}</span>
+                          <button type="button"
+                            onClick={() => setAddForm(f => ({ ...f, familyMembers: f.familyMembers.filter((_, i) => i !== idx) }))}
+                            className="text-white/40 hover:text-destructive transition-colors">
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-semibold mb-1 uppercase tracking-wider text-white/50">Name *</label>
+                          <input type="text" placeholder="Member name"
+                            className="w-full p-2.5 rounded-lg focus:outline-none border-0 bg-sidebar-accent text-white text-sm placeholder:text-white/30"
+                            value={m.name}
+                            onChange={e => { const members = [...addForm.familyMembers]; members[idx] = { ...m, name: e.target.value }; setAddForm(f => ({ ...f, familyMembers: members })); }} />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-semibold mb-1 uppercase tracking-wider text-white/50">Gender</label>
+                          <div className="flex gap-2">
+                            {[{ label: "♂ Male", value: "male" }, { label: "♀ Female", value: "female" }].map(g => (
+                              <button key={g.value} type="button"
+                                onClick={() => { const members = [...addForm.familyMembers]; members[idx] = { ...m, gender: m.gender === g.value ? "" : g.value }; setAddForm(f => ({ ...f, familyMembers: members })); }}
+                                className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all ${m.gender === g.value ? "bg-primary text-white" : "bg-sidebar-accent text-white/50 hover:text-white"}`}>
+                                {g.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-semibold mb-1 uppercase tracking-wider text-white/50">Contact No</label>
+                          <input type="tel" placeholder="10-digit number"
+                            className="w-full p-2.5 rounded-lg focus:outline-none border-0 bg-sidebar-accent text-white text-sm placeholder:text-white/30"
+                            value={m.phone}
+                            maxLength={10}
+                            onChange={e => { const v = e.target.value.replace(/\D/g, ""); const members = [...addForm.familyMembers]; members[idx] = { ...m, phone: v }; setAddForm(f => ({ ...f, familyMembers: members })); }} />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-[10px] font-semibold mb-1 uppercase tracking-wider text-white/50">Birth Date <span className="opacity-50">(opt)</span></label>
+                            <input type="date"
+                              className="w-full p-2.5 rounded-lg focus:outline-none border-0 bg-sidebar-accent text-white text-sm [&::-webkit-calendar-picker-indicator]:invert"
+                              value={m.dob}
+                              onChange={e => { const members = [...addForm.familyMembers]; members[idx] = { ...m, dob: e.target.value }; setAddForm(f => ({ ...f, familyMembers: members })); }} />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-semibold mb-1 uppercase tracking-wider text-white/50">Anniversary <span className="opacity-50">(opt)</span></label>
+                            <input type="date"
+                              className="w-full p-2.5 rounded-lg focus:outline-none border-0 bg-sidebar-accent text-white text-sm [&::-webkit-calendar-picker-indicator]:invert"
+                              value={m.anniversary}
+                              onChange={e => { const members = [...addForm.familyMembers]; members[idx] = { ...m, anniversary: e.target.value }; setAddForm(f => ({ ...f, familyMembers: members })); }} />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => { setShowAddCustomer(false); setAddPhoneError(""); setAddForm({ name: "", phone: "", dob: "", gender: "", anniversary: "", membershipId: "", membershipStartDate: "" }); }}
+                <button type="button" onClick={() => { setShowAddCustomer(false); resetAddForm(); }}
                   className="flex-1 py-3 rounded-xl font-semibold transition-colors bg-sidebar text-white hover:bg-sidebar/80">Cancel</button>
                 <button type="submit" disabled={addLoading}
                   className="flex-1 py-3 rounded-xl font-semibold text-white disabled:opacity-50 transition-all rose-gold-gradient"
