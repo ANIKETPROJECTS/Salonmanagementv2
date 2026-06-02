@@ -84,12 +84,19 @@ router.post("/customer-memberships", async (req, res) => {
   res.status(201).json({ ...cm.toObject(), id: cm._id.toString() });
 });
 
-// List all active customer memberships
+// List all active customer memberships (exclude family sub-members — they are covered under their parent)
 router.get("/customer-memberships", async (_req, res) => {
   const today = format(new Date(), "yyyy-MM-dd");
   const memberships = await CustomerMembership.find({ isActive: true, endDate: { $gte: today } }).sort({ createdAt: -1 });
+
+  // Filter out family-member customers (those with familyOf set) so they don't appear as standalone cards
+  const customerIds = memberships.map((cm) => cm.customerId);
+  const familyMembers = await Customer.find({ _id: { $in: customerIds }, familyOf: { $exists: true, $ne: null } }, { _id: 1 });
+  const familyMemberIds = new Set(familyMembers.map((fm) => fm._id.toString()));
+
+  const filtered = memberships.filter((cm) => !familyMemberIds.has(cm.customerId));
   res.json({
-    customerMemberships: memberships.map((cm) => ({ ...cm.toObject(), id: cm._id.toString() })),
+    customerMemberships: filtered.map((cm) => ({ ...cm.toObject(), id: cm._id.toString() })),
   });
 });
 
