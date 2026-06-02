@@ -17,6 +17,7 @@ export interface ICustomer extends Document {
   anniversary?: string;
   notes?: string;
   gender?: string;
+  familyOf?: mongoose.Types.ObjectId | string | null;
   familyMembers?: IFamilyMember[];
   totalSpend: number;
   totalVisits: number;
@@ -43,6 +44,7 @@ const CustomerSchema = new Schema<ICustomer>(
     anniversary: String,
     notes: String,
     gender: { type: String, enum: ["male", "female", ""], default: "" },
+    familyOf: { type: Schema.Types.ObjectId, ref: "Customer", default: null },
     familyMembers: { type: [FamilyMemberSchema], default: [] },
     totalSpend: { type: Number, default: 0 },
     totalVisits: { type: Number, default: 0 },
