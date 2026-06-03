@@ -231,6 +231,31 @@ export default function POS() {
   const handleAddCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!/^\d{10}$/.test(addForm.phone)) { setAddPhoneError("Phone must be exactly 10 digits"); return; }
+
+    // Frontend uniqueness check against loaded customers (phones of main customers + their family members)
+    const allExistingPhones: string[] = [];
+    for (const c of customers as any[]) {
+      if (c.phone) allExistingPhones.push(c.phone);
+      for (const m of (c.familyMembers || [])) { if (m.phone) allExistingPhones.push(m.phone); }
+    }
+    if (allExistingPhones.includes(addForm.phone)) {
+      setAddPhoneError("This phone number is already registered in the system.");
+      return;
+    }
+
+    // Validate family member phones
+    if (showPOSFamilySection) {
+      const validFM = addForm.familyMembers.filter(m => m.name.trim());
+      for (let i = 0; i < validFM.length; i++) {
+        const m = validFM[i];
+        if (!m.phone) continue;
+        if (!/^\d{10}$/.test(m.phone)) { setAddPhoneError(`Family member ${i + 1}: phone must be 10 digits`); return; }
+        if (m.phone === addForm.phone) { setAddPhoneError(`Family member ${i + 1}: cannot match the customer's phone`); return; }
+        if (validFM.slice(0, i).some(prev => prev.phone === m.phone)) { setAddPhoneError(`Family member ${i + 1}: duplicate phone number`); return; }
+        if (allExistingPhones.includes(m.phone)) { setAddPhoneError(`Family member ${i + 1}: phone already registered`); return; }
+      }
+    }
+
     setAddLoading(true);
     try {
       const validFamilyMembers = addForm.familyMembers.filter(m => m.name.trim());
@@ -819,7 +844,8 @@ export default function POS() {
                 </div>
               )}
 
-              {/* Family Members */}
+              {/* Family Members — only available when a membership is selected */}
+              {addForm.membershipId && (
               <div className="border border-sidebar-border rounded-2xl overflow-hidden">
                 <button
                   type="button"
@@ -910,6 +936,7 @@ export default function POS() {
                   </div>
                 )}
               </div>
+              )}
 
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => { setShowAddCustomer(false); resetAddForm(); }}

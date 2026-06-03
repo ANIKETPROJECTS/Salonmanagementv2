@@ -160,6 +160,45 @@ export default function Customers() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validatePhone(formData.phone)) return;
+
+    // Frontend uniqueness check — phone must not already exist
+    const existingByPhone = allCustomers.find(c =>
+      c.phone === formData.phone ||
+      (Array.isArray(c.familyMembers) && c.familyMembers.some((m: any) => m.phone === formData.phone))
+    );
+    if (existingByPhone) {
+      setPhoneError("This phone number is already registered in the system.");
+      return;
+    }
+
+    // Validate family member phones
+    if (showFamilySection && formData.familyMembers.length > 0) {
+      const memberErrs: Record<number, { name?: string; phone?: string }> = {};
+      for (let i = 0; i < formData.familyMembers.length; i++) {
+        const m = formData.familyMembers[i];
+        if (!m.name.trim()) continue;
+        if (m.phone) {
+          if (!/^\d{10}$/.test(m.phone)) {
+            memberErrs[i] = { ...memberErrs[i], phone: "Phone must be exactly 10 digits" };
+          } else if (m.phone === formData.phone) {
+            memberErrs[i] = { ...memberErrs[i], phone: "Cannot be the same as the main customer's phone" };
+          } else if (formData.familyMembers.slice(0, i).some(prev => prev.phone === m.phone)) {
+            memberErrs[i] = { ...memberErrs[i], phone: "Duplicate number within family members" };
+          } else {
+            const taken = allCustomers.find(c =>
+              c.phone === m.phone ||
+              (Array.isArray(c.familyMembers) && c.familyMembers.some((fm: any) => fm.phone === m.phone))
+            );
+            if (taken) memberErrs[i] = { ...memberErrs[i], phone: "This phone is already registered" };
+          }
+        }
+      }
+      if (Object.keys(memberErrs).length > 0) {
+        setCreateFieldErrors({ members: memberErrs });
+        return;
+      }
+    }
+
     setCreateLoading(true);
     try {
       const res = await fetch(`${API_BASE}/customers`, {

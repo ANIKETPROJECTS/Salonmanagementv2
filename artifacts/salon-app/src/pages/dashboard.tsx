@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Users, Receipt, TrendingUp, AlertCircle, Star, Package,
-  CalendarDays, Clock, CheckCircle2, XCircle, Scissors, ShoppingBag
+  CalendarDays, Clock, CheckCircle2, XCircle, Scissors, ShoppingBag, RefreshCw
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
-  Cell,
+  Cell, Area, AreaChart,
 } from "recharts";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -25,8 +25,8 @@ function useStats() {
     } catch {}
     setLoading(false);
   };
-  useState(() => { refresh(); });
-  return { data, loading };
+  useEffect(() => { refresh(); }, []);
+  return { data, loading, refresh };
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -40,7 +40,7 @@ const PRODUCT_COLORS = ["#7c3aed", "#a855f7", "#c084fc", "#d8b4fe", "#e9d5ff"];
 const SERVICE_COLORS = ["#be185d", "#db2777", "#ec4899", "#f472b6", "#fbcfe8"];
 
 export default function Dashboard() {
-  const { data: stats, loading } = useStats();
+  const { data: stats, loading, refresh } = useStats();
   const [apptTab, setApptTab] = useState<"today" | "week" | "month">("today");
   const [viewInvoiceBill, setViewInvoiceBill] = useState<any>(null);
 
@@ -76,6 +76,7 @@ export default function Dashboard() {
   const todayAppts = s.todayAppointments || [];
   const weekAppts = s.weekAppointments || [];
   const monthAppts = s.monthAppointments || [];
+  const monthlyRevenue: { month: string; revenue: number }[] = s.monthlyRevenue || [];
 
   const apptList = apptTab === "today" ? todayAppts : apptTab === "week" ? weekAppts : monthAppts;
 
@@ -112,9 +113,15 @@ export default function Dashboard() {
   return (
     <div className="p-6 max-w-7xl mx-auto animate-in fade-in duration-500">
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-serif font-bold text-primary">Dashboard</h1>
-        <p className="text-muted-foreground mt-1 text-sm">{format(new Date(), "EEEE, dd MMMM yyyy")}</p>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-serif font-bold text-primary">Dashboard</h1>
+          <p className="text-muted-foreground mt-1 text-sm">{format(new Date(), "EEEE, dd MMMM yyyy")}</p>
+        </div>
+        <button onClick={refresh}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl border border-border bg-card hover:bg-muted transition-colors text-sm font-medium text-muted-foreground hover:text-foreground">
+          <RefreshCw className="w-4 h-4" /> Refresh
+        </button>
       </div>
 
       {/* Metric Cards */}
@@ -135,6 +142,35 @@ export default function Dashboard() {
           </Card>
         ))}
       </div>
+
+      {/* Monthly Revenue Trend */}
+      {monthlyRevenue.length > 0 && (
+        <Card className="rounded-2xl border-border/50 mb-6">
+          <CardContent className="p-6">
+            <h3 className="font-semibold mb-4 flex items-center gap-2 text-sm">
+              <TrendingUp className="w-4 h-4 text-emerald-600" /> Revenue Trend — Last 6 Months
+            </h3>
+            <ResponsiveContainer width="100%" height={160}>
+              <AreaChart data={monthlyRevenue} margin={{ left: 0, right: 10, top: 5, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#059669" stopOpacity={0.15} />
+                    <stop offset="95%" stopColor="#059669" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                <XAxis dataKey="month" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `₹${(v / 1000).toFixed(0)}k`} axisLine={false} tickLine={false} width={48} />
+                <Tooltip
+                  formatter={(v: any) => [`₹${Number(v).toLocaleString("en-IN")}`, "Revenue"]}
+                  contentStyle={{ borderRadius: 12, fontSize: 12, border: "1px solid #e5e7eb" }}
+                />
+                <Area type="monotone" dataKey="revenue" stroke="#059669" strokeWidth={2.5} fill="url(#revenueGradient)" dot={{ r: 4, fill: "#059669", strokeWidth: 0 }} activeDot={{ r: 6 }} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">

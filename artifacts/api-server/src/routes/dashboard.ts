@@ -73,6 +73,26 @@ router.get("/dashboard/stats", async (_req, res) => {
 
   const mapAppt = (a: any) => ({ ...a.toObject(), id: a._id.toString() });
 
+  // Last 6 months revenue trend
+  const sixMonthsAgo = new Date(now);
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
+  sixMonthsAgo.setDate(1);
+  sixMonthsAgo.setHours(0, 0, 0, 0);
+
+  const sixMonthBills = await Bill.find({ createdAt: { $gte: sixMonthsAgo } });
+  const monthlyRevenueMap: Record<string, number> = {};
+  for (const bill of sixMonthBills) {
+    const key = format(new Date(bill.createdAt as any), "MMM yyyy");
+    monthlyRevenueMap[key] = (monthlyRevenueMap[key] || 0) + bill.finalAmount;
+  }
+  const monthlyRevenue = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now);
+    d.setMonth(d.getMonth() - i);
+    const key = format(d, "MMM yyyy");
+    monthlyRevenue.push({ month: format(d, "MMM"), revenue: monthlyRevenueMap[key] || 0 });
+  }
+
   res.json({
     todayRevenue,
     todayBills,
@@ -82,6 +102,7 @@ router.get("/dashboard/stats", async (_req, res) => {
     lowStockCount,
     topServices,
     topProducts,
+    monthlyRevenue,
     todayBillsList: todayBillDocs.map((b) => ({ ...b.toObject(), id: b._id.toString() })),
     todayAppointments: todayAppts.map(mapAppt),
     weekAppointments: weekAppts.map(mapAppt),

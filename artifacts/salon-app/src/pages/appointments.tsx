@@ -96,14 +96,15 @@ function SearchSelect({ placeholder, value, onChange, options, getLabel, getId }
 }
 
 // ─── Add Customer Modal ───────────────────────────────────────────────────────
-function AddCustomerModal({ onClose, onSaved }: {
-  onClose: () => void; onSaved: (customer: any) => void;
+function AddCustomerModal({ onClose, onSaved, existingPhones }: {
+  onClose: () => void; onSaved: (customer: any) => void; existingPhones?: Set<string>;
 }) {
   type FM = { name: string; phone: string; gender: string; dob: string; anniversary: string };
   const EMPTY_FM: FM = { name: "", phone: "", gender: "", dob: "", anniversary: "" };
 
   const [form, setForm] = useState({ name: "", phone: "", dob: "", anniversary: "", gender: "", membershipId: "", membershipStartDate: "" });
   const [phoneError, setPhoneError] = useState("");
+  const [familyErrors, setFamilyErrors] = useState<Record<number, string>>({});
   const [saving, setSaving] = useState(false);
   const [familyMembers, setFamilyMembers] = useState<FM[]>([]);
   const [showFamilySection, setShowFamilySection] = useState(false);
@@ -122,13 +123,35 @@ function AddCustomerModal({ onClose, onSaved }: {
     e.preventDefault();
     e.stopPropagation();
     if (!validatePhone(form.phone)) return;
+
+    // Check if phone already exists
+    if (existingPhones?.has(form.phone)) {
+      setPhoneError("This phone number is already registered in the system.");
+      return;
+    }
+
+    // Validate family member phones (only when membership is selected)
+    if (form.membershipId && showFamilySection) {
+      const validFM = familyMembers.filter(m => m.name.trim());
+      const errs: Record<number, string> = {};
+      for (let i = 0; i < validFM.length; i++) {
+        const m = validFM[i];
+        if (!m.phone) continue;
+        if (!/^\d{10}$/.test(m.phone)) { errs[i] = "Phone must be exactly 10 digits"; continue; }
+        if (m.phone === form.phone) { errs[i] = "Cannot match the customer's phone number"; continue; }
+        if (validFM.slice(0, i).some(prev => prev.phone === m.phone)) { errs[i] = "Duplicate phone within family members"; continue; }
+        if (existingPhones?.has(m.phone)) { errs[i] = "This phone is already registered"; }
+      }
+      if (Object.keys(errs).length > 0) { setFamilyErrors(errs); return; }
+    }
+    setFamilyErrors({});
+
     setSaving(true);
     try {
-      const validFM = familyMembers.filter(m => m.name.trim());
       const res = await fetch(`${API_BASE}/customers`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: form.name, phone: form.phone, dob: form.dob, anniversary: form.anniversary, gender: form.gender, email: "", familyMembers: validFM }),
+        body: JSON.stringify({ name: form.name, phone: form.phone, dob: form.dob, anniversary: form.anniversary, gender: form.gender, email: "" }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -136,13 +159,26 @@ function AddCustomerModal({ onClose, onSaved }: {
         return;
       }
       const created = await res.json();
+      const newId = created.id || created._id;
+
       if (form.membershipId) {
         const today = new Date().toISOString().slice(0, 10);
         await fetch(`${API_BASE}/customer-memberships`, {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ customerId: created.id || created._id, membershipId: form.membershipId, startDate: form.membershipStartDate || today }),
+          body: JSON.stringify({ customerId: newId, membershipId: form.membershipId, startDate: form.membershipStartDate || today }),
         }).catch(() => {});
       }
+
+      // Submit family members via dedicated endpoint (not in POST body)
+      if (form.membershipId && showFamilySection) {
+        for (const member of familyMembers.filter(m => m.name.trim())) {
+          await fetch(`${API_BASE}/customers/${newId}/family-member`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(member),
+          }).catch(() => {});
+        }
+      }
+
       onSaved(created);
     } catch {
       setPhoneError("Failed to save. Try again.");
@@ -209,7 +245,11 @@ function AddCustomerModal({ onClose, onSaved }: {
               <label className="block text-sm font-medium mb-1 text-muted-foreground">Membership Plan (optional)</label>
               <select
                 value={form.membershipId}
-                onChange={e => setForm({ ...form, membershipId: e.target.value })}
+                onChange={e => {
+                  const val = e.target.value;
+                  setForm({ ...form, membershipId: val });
+                  if (!val) { setShowFamilySection(false); setFamilyMembers([]); }
+                }}
                 className="w-full p-3 rounded-xl border bg-muted/30 focus:ring-2 focus:ring-primary/20 outline-none text-sm">
                 <option value="">No membership</option>
                 {memberships.map((m: any) => (
@@ -228,10 +268,14 @@ function AddCustomerModal({ onClose, onSaved }: {
             </div>
           )}
 
-          {/* Family Members */}
+          {/* Family Members — only when membership is selected */}
+          {form.membershipId && (
           <div className="border border-border/60 rounded-xl overflow-hidden">
             <button type="button"
-              onClick={() => setShowFamilySection(!showFamilySection)}
+              onClick={() => {
+                if (!showFamilySection) { setShowFamilySection(true); if (familyMembers.length === 0) setFamilyMembers([{ ...EMPTY_FM }]); }
+                else setShowFamilySection(false);
+              }}
               className="w-full flex items-center justify-between px-4 py-3 bg-muted/30 hover:bg-muted/50 transition-colors text-sm font-semibold">
               <span className="flex items-center gap-2">
                 <UserPlus className="w-4 h-4 text-primary" />
@@ -248,13 +292,16 @@ function AddCustomerModal({ onClose, onSaved }: {
                       <button type="button" onClick={() => setFamilyMembers(prev => prev.filter((_, ii) => ii !== i))}
                         className="text-xs text-red-500 hover:underline">Remove</button>
                     </div>
-                    <input type="text" required placeholder="Name *" value={fm.name}
+                    <input type="text" placeholder="Name *" value={fm.name}
                       onChange={e => setFamilyMembers(prev => prev.map((x, ii) => ii === i ? { ...x, name: e.target.value } : x))}
                       className="w-full p-2 rounded-lg border border-border bg-background text-sm focus:ring-2 focus:ring-primary/20 outline-none" />
                     <div className="grid grid-cols-2 gap-2">
-                      <input type="tel" placeholder="Phone" value={fm.phone} maxLength={10}
-                        onChange={e => setFamilyMembers(prev => prev.map((x, ii) => ii === i ? { ...x, phone: e.target.value.replace(/\D/g, "").slice(0, 10) } : x))}
-                        className="p-2 rounded-lg border border-border bg-background text-sm focus:ring-2 focus:ring-primary/20 outline-none" />
+                      <div>
+                        <input type="tel" placeholder="Phone (10 digits)" value={fm.phone} maxLength={10}
+                          onChange={e => { setFamilyMembers(prev => prev.map((x, ii) => ii === i ? { ...x, phone: e.target.value.replace(/\D/g, "").slice(0, 10) } : x)); setFamilyErrors(fe => { const n = { ...fe }; delete n[i]; return n; }); }}
+                          className={`w-full p-2 rounded-lg border bg-background text-sm focus:ring-2 outline-none ${familyErrors[i] ? "border-red-400 focus:ring-red-200" : "border-border focus:ring-primary/20"}`} />
+                        {familyErrors[i] && <p className="text-red-500 text-[10px] mt-0.5">{familyErrors[i]}</p>}
+                      </div>
                       <select value={fm.gender}
                         onChange={e => setFamilyMembers(prev => prev.map((x, ii) => ii === i ? { ...x, gender: e.target.value } : x))}
                         className="p-2 rounded-lg border border-border bg-background text-sm focus:ring-2 focus:ring-primary/20 outline-none">
@@ -286,11 +333,12 @@ function AddCustomerModal({ onClose, onSaved }: {
                     <Plus className="w-3.5 h-3.5" /> Add Family Member
                   </button>
                 ) : (
-                  <p className="text-xs text-muted-foreground text-center py-2 bg-muted/30 rounded-xl">Maximum 4 sub-members allowed</p>
+                  <p className="text-xs text-muted-foreground text-center py-2 bg-muted/30 rounded-xl">Maximum 4 family members allowed</p>
                 )}
               </div>
             )}
           </div>
+          )}
 
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={onClose}
@@ -315,6 +363,15 @@ function CustomerSelect({ value, onChange, customers, onCustomerCreated }: {
   const [search, setSearch] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+
+  const existingPhones = useMemo(() => {
+    const phones = new Set<string>();
+    for (const c of customers) {
+      if (c.phone) phones.add(c.phone);
+      for (const m of (c.familyMembers || [])) { if (m.phone) phones.add(m.phone); }
+    }
+    return phones;
+  }, [customers]);
 
   const selected = customers.find(c => (c.id || c._id) === value);
   const displayLabel = !value ? "Walk-in" : selected ? `${selected.name}${selected.phone ? ` · ${selected.phone}` : ""}` : "Walk-in";
@@ -381,6 +438,7 @@ function CustomerSelect({ value, onChange, customers, onCustomerCreated }: {
       {showAddModal && (
         <AddCustomerModal
           onClose={() => setShowAddModal(false)}
+          existingPhones={existingPhones}
           onSaved={(created) => {
             onCustomerCreated(created);
             onChange(created.id || created._id);
