@@ -103,6 +103,7 @@ function AddCustomerModal({ onClose, onSaved, existingPhones }: {
   const EMPTY_FM: FM = { name: "", phone: "", gender: "", dob: "", anniversary: "" };
 
   const [form, setForm] = useState({ name: "", phone: "", dob: "", anniversary: "", gender: "", membershipId: "", membershipStartDate: "" });
+  const [nameError, setNameError] = useState("");
   const [phoneError, setPhoneError] = useState("");
   const [familyErrors, setFamilyErrors] = useState<Record<number, string>>({});
   const [saving, setSaving] = useState(false);
@@ -119,9 +120,9 @@ function AddCustomerModal({ onClose, onSaved, existingPhones }: {
     setPhoneError(""); return true;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const handleSubmit = async () => {
+    if (!form.name.trim()) { setNameError("Name is required"); return; }
+    setNameError("");
     if (!validatePhone(form.phone)) return;
 
     // Check if phone already exists
@@ -196,12 +197,13 @@ function AddCustomerModal({ onClose, onSaved, existingPhones }: {
             <X className="w-5 h-5" />
           </button>
         </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1">
+        <div className="p-6 space-y-4 overflow-y-auto flex-1">
           <div>
             <label className="block text-sm font-medium mb-1 text-muted-foreground">Full Name *</label>
-            <input required autoFocus placeholder="Enter full name"
-              className="w-full p-3 rounded-xl border bg-muted/30 focus:ring-2 focus:ring-primary/20 outline-none"
-              value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
+            <input autoFocus placeholder="Enter full name"
+              className={`w-full p-3 rounded-xl border bg-muted/30 focus:ring-2 outline-none ${nameError ? "border-red-400 focus:ring-red-200" : "focus:ring-primary/20"}`}
+              value={form.name} onChange={e => { setForm({ ...form, name: e.target.value }); if (e.target.value.trim()) setNameError(""); }} />
+            {nameError && <p className="text-red-500 text-xs mt-1">{nameError}</p>}
           </div>
           <div>
             <label className="block text-sm font-medium mb-2 text-muted-foreground">Gender</label>
@@ -217,11 +219,11 @@ function AddCustomerModal({ onClose, onSaved, existingPhones }: {
           </div>
           <div>
             <label className="block text-sm font-medium mb-1 text-muted-foreground">Phone Number * (10 digits)</label>
-            <input required type="tel" maxLength={10} placeholder="10-digit mobile number"
+            <input type="tel" maxLength={10} placeholder="10-digit mobile number"
               className={`w-full p-3 rounded-xl border bg-muted/30 focus:ring-2 outline-none ${phoneError ? "border-red-400 focus:ring-red-200" : "focus:ring-primary/20"}`}
               value={form.phone}
               onChange={e => { const v = e.target.value.replace(/\D/g, ""); setForm({ ...form, phone: v }); if (v.length === 10) setPhoneError(""); }}
-              onBlur={e => validatePhone(e.target.value)} />
+              onBlur={e => { if (e.target.value) validatePhone(e.target.value); }} />
             {phoneError && <p className="text-red-500 text-xs mt-1">{phoneError}</p>}
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -343,12 +345,12 @@ function AddCustomerModal({ onClose, onSaved, existingPhones }: {
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={onClose}
               className="flex-1 py-3 rounded-xl border hover:bg-muted font-medium transition-colors">Cancel</button>
-            <button type="submit" disabled={saving}
+            <button type="button" onClick={handleSubmit} disabled={saving}
               className="flex-1 py-3 rounded-xl bg-primary text-white font-medium hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20 disabled:opacity-50">
               {saving ? "Saving..." : "Add Customer"}
             </button>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   );
