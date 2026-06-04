@@ -3,18 +3,31 @@ import { Bill, Customer } from "../models/index.js";
 
 const router = Router();
 
-// Generate sequential bill number: TT{YYYYMMDD}-{seq}, sequence resets daily
+// Generate sequential bill number: TT{YYYYMMDD}-{seq}, sequence resets daily.
+// Uses the highest existing sequence for today to avoid duplicates caused by
+// deleted bills (count gaps) or pre-existing data in the database.
 async function generateBillNumber(): Promise<string> {
   const now = new Date();
   const yyyy = String(now.getFullYear());
   const mm = String(now.getMonth() + 1).padStart(2, "0");
   const dd = String(now.getDate()).padStart(2, "0");
   const dateStr = `${yyyy}${mm}${dd}`;
-  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-  const todayCount = await Bill.countDocuments({ createdAt: { $gte: startOfDay, $lt: endOfDay } });
-  const seq = String(todayCount + 1).padStart(2, "0");
-  return `TT${dateStr}-${seq}`;
+  const prefix = `TT${dateStr}-`;
+
+  // Find the last bill issued today (sorted descending by billNumber string)
+  const lastBill = await Bill.findOne(
+    { billNumber: { $regex: `^${prefix}` } },
+    { billNumber: 1 },
+  ).sort({ billNumber: -1 });
+
+  let nextSeq = 1;
+  if (lastBill?.billNumber) {
+    const parts = lastBill.billNumber.split("-");
+    const lastSeq = parseInt(parts[parts.length - 1], 10);
+    if (!isNaN(lastSeq)) nextSeq = lastSeq + 1;
+  }
+
+  return `${prefix}${String(nextSeq).padStart(2, "0")}`;
 }
 
 router.get("/bills", async (req, res) => {
